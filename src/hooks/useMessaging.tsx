@@ -41,7 +41,7 @@ export function useMessaging() {
     setIsLoading(true);
 
     try {
-      // Use the messages table instead of chat_messages
+      // Use the messages table
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
         .select(`
@@ -49,8 +49,8 @@ export function useMessaging() {
           content,
           sender_id,
           receiver_id,
-          timestamp as created_at,
-          is_read as read
+          timestamp,
+          is_read
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('timestamp', { ascending: false });
@@ -101,11 +101,11 @@ export function useMessaging() {
             userId: otherUserId,
             userName: otherUserName,
             lastMessage: msg.content,
-            timestamp: msg.created_at,
-            unread: (!msg.read && !isCurrentUserSender) ? 1 : 0
+            timestamp: msg.timestamp,
+            unread: (!msg.is_read && !isCurrentUserSender) ? 1 : 0
           });
 
-          if (!msg.read && !isCurrentUserSender) {
+          if (!msg.is_read && !isCurrentUserSender) {
             totalUnread++;
           }
         }
@@ -137,8 +137,8 @@ export function useMessaging() {
           content,
           sender_id,
           receiver_id,
-          timestamp as created_at,
-          is_read as read
+          timestamp,
+          is_read
         `)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
         .order('timestamp', { ascending: true });
@@ -179,8 +179,8 @@ export function useMessaging() {
         content: msg.content,
         senderId: msg.sender_id,
         receiverId: msg.receiver_id,
-        createdAt: msg.created_at,
-        read: msg.read,
+        createdAt: msg.timestamp,
+        read: msg.is_read,
         senderName: userMap.get(msg.sender_id) || 'Unknown User',
         receiverName: userMap.get(msg.receiver_id) || 'Unknown User'
       }));
@@ -189,7 +189,7 @@ export function useMessaging() {
 
       // Mark unread messages as read
       const unreadMessages = data
-        .filter(msg => msg.receiver_id === user.id && !msg.read)
+        .filter(msg => msg.receiver_id === user.id && !msg.is_read)
         .map(msg => msg.id);
 
       if (unreadMessages.length > 0) {

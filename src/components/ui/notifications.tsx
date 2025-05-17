@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,12 +48,14 @@ export function NotificationsPopover() {
           return;
         }
         
-        // Fetch user names separately
-        const userIds = data ? data.map(activity => activity.user_id) : [];
-        if (userIds.length === 0) {
+        // If no data, set empty array
+        if (!data || data.length === 0) {
           setActivityNotifications([]);
           return;
         }
+        
+        // Fetch user names separately
+        const userIds = data.map(activity => activity.user_id);
         
         const { data: usersData, error: usersError } = await supabase
           .from('users')
@@ -75,10 +76,10 @@ export function NotificationsPopover() {
         }
         
         // Combine activity data with user names
-        const activitiesWithUserNames = data ? data.map(activity => ({
+        const activitiesWithUserNames = data.map(activity => ({
           ...activity,
           userName: userMap.get(activity.user_id) || 'Unknown User'
-        })) : [];
+        }));
         
         setActivityNotifications(activitiesWithUserNames);
       } catch (error) {
