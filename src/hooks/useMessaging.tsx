@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,9 +74,10 @@ export function useMessaging() {
       messagesData.forEach(msg => {
         const isCurrentUserSender = msg.sender_id === user.id;
         const otherUserId = isCurrentUserSender ? msg.receiver_id : msg.sender_id;
+        // Use type assertion and provide fallback for potentially undefined properties
         const otherUserName = isCurrentUserSender 
-          ? msg.receiver?.full_name || 'Unknown User'
-          : msg.sender?.full_name || 'Unknown User';
+          ? (msg.receiver?.full_name as string || 'Unknown User')
+          : (msg.sender?.full_name as string || 'Unknown User');
 
         if (!userConversations.has(otherUserId)) {
           userConversations.set(otherUserId, {
@@ -141,8 +143,9 @@ export function useMessaging() {
         receiverId: msg.receiver_id,
         createdAt: msg.created_at,
         read: msg.read,
-        senderName: msg.sender?.full_name,
-        receiverName: msg.receiver?.full_name
+        // Use type assertion and provide fallback for potentially undefined properties
+        senderName: msg.sender?.full_name as string || 'Unknown User',
+        receiverName: msg.receiver?.full_name as string || 'Unknown User'
       }));
 
       setMessages(formattedMessages);
@@ -214,7 +217,10 @@ export function useMessaging() {
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
         (payload) => {
-          const newMessage = payload.new;
+          // Type safety for new message
+          if (!payload.new) return;
+          
+          const newMessage = payload.new as Record<string, any>;
           
           // Only process messages related to the current user
           if (newMessage.sender_id === user.id || newMessage.receiver_id === user.id) {

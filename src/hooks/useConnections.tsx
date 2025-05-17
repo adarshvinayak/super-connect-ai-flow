@@ -56,8 +56,9 @@ export function useConnections() {
         status: conn.status,
         createdAt: conn.created_at,
         updatedAt: conn.updated_at,
-        senderName: conn.sender?.full_name,
-        receiverName: conn.receiver?.full_name
+        // Safely access potentially missing properties
+        senderName: conn.sender?.full_name as string || 'Unknown User',
+        receiverName: conn.receiver?.full_name as string || 'Unknown User'
       }));
 
       // Filter by status and role
@@ -231,12 +232,15 @@ export function useConnections() {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'connection_requests' }, 
         (payload) => {
-          const newData = payload.new || {};
-          const oldData = payload.old || {};
+          // Type safety for payload
+          if (!payload.new && !payload.old) return;
+          
+          const newData = payload.new as Record<string, any> || {};
+          const oldData = payload.old as Record<string, any> || {};
           
           // Only react to changes relevant to the current user
-          if (newData.sender_id === user.id || newData.receiver_id === user.id || 
-              oldData.sender_id === user.id || oldData.receiver_id === user.id) {
+          if ((newData.sender_id === user.id || newData.receiver_id === user.id || 
+              oldData.sender_id === user.id || oldData.receiver_id === user.id)) {
             fetchConnections();
             
             // Show notifications for new requests
