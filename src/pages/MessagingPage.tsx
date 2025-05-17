@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,9 +60,19 @@ const MessagingPage = () => {
         for (const conn of connectionData || []) {
           // Determine the other user in the connection
           const isCurrentUserSender = conn.sender_id === user.id;
-          // Use type assertion to handle the possible error types
-          const otherUser = isCurrentUserSender ? conn.receiver as UserData : conn.sender as UserData;
-          const otherId = otherUser.user_id;
+          
+          // Safely handle potentially missing data
+          const otherUserData = isCurrentUserSender 
+            ? (conn.receiver && typeof conn.receiver === 'object' && !('error' in conn.receiver) ? conn.receiver as UserData : null)
+            : (conn.sender && typeof conn.sender === 'object' && !('error' in conn.sender) ? conn.sender as UserData : null);
+          
+          // Skip if we can't get valid user data
+          if (!otherUserData) {
+            console.error("Invalid user data for connection:", conn.id);
+            continue;
+          }
+          
+          const otherId = otherUserData.user_id;
           
           // Get unread message count
           const { count, error: countError } = await supabase
@@ -83,7 +94,7 @@ const MessagingPage = () => {
           
           connectionsList.push({
             id: otherId,
-            name: otherUser.full_name,
+            name: otherUserData.full_name,
             lastMessage: lastMessageData && lastMessageData[0]?.content,
             unreadCount: count || 0
           });

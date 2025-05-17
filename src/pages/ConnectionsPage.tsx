@@ -125,8 +125,17 @@ const ConnectionsPage = () => {
       // Format the accepted connections
       const acceptedConnections = (acceptedData || []).map(conn => {
         const isCurrentUserSender = conn.sender_id === user.id;
-        // Use type assertion to handle the possible error types
-        const profile = isCurrentUserSender ? conn.receiver as UserData : conn.sender as UserData;
+        
+        // Safely handle potentially missing data
+        const profile = isCurrentUserSender 
+          ? (conn.receiver && typeof conn.receiver === 'object' && !('error' in conn.receiver) ? conn.receiver as UserData : null)
+          : (conn.sender && typeof conn.sender === 'object' && !('error' in conn.sender) ? conn.sender as UserData : null);
+        
+        // If we can't get a valid profile, skip this connection
+        if (!profile) {
+          console.error("Invalid profile data for connection:", conn.id);
+          return null;
+        }
         
         return {
           id: profile.user_id,
@@ -137,29 +146,53 @@ const ConnectionsPage = () => {
           connectionId: conn.id,
           status: conn.status
         };
-      });
+      }).filter(Boolean) as ConnectionProfile[];
       
       // Format the sent requests
-      const formattedSent = (sentData || []).map(conn => ({
-        id: (conn.receiver as UserData).user_id,
-        name: (conn.receiver as UserData).full_name,
-        role: (conn.receiver as UserData).role || "Professional",
-        location: (conn.receiver as UserData).location || "Location not specified",
-        skills: (conn.receiver as UserData).skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
-        connectionId: conn.id,
-        status: conn.status
-      }));
+      const formattedSent = (sentData || []).map(conn => {
+        // Safely handle potentially missing data
+        const receiver = conn.receiver && typeof conn.receiver === 'object' && !('error' in conn.receiver) 
+          ? conn.receiver as UserData 
+          : null;
+        
+        if (!receiver) {
+          console.error("Invalid receiver data for sent request:", conn.id);
+          return null;
+        }
+        
+        return {
+          id: receiver.user_id,
+          name: receiver.full_name,
+          role: receiver.role || "Professional",
+          location: receiver.location || "Location not specified",
+          skills: receiver.skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
+          connectionId: conn.id,
+          status: conn.status
+        };
+      }).filter(Boolean) as ConnectionProfile[];
       
       // Format the received requests
-      const formattedReceived = (receivedData || []).map(conn => ({
-        id: (conn.sender as UserData).user_id,
-        name: (conn.sender as UserData).full_name,
-        role: (conn.sender as UserData).role || "Professional",
-        location: (conn.sender as UserData).location || "Location not specified",
-        skills: (conn.sender as UserData).skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
-        connectionId: conn.id,
-        status: conn.status
-      }));
+      const formattedReceived = (receivedData || []).map(conn => {
+        // Safely handle potentially missing data
+        const sender = conn.sender && typeof conn.sender === 'object' && !('error' in conn.sender) 
+          ? conn.sender as UserData
+          : null;
+          
+        if (!sender) {
+          console.error("Invalid sender data for received request:", conn.id);
+          return null;
+        }
+        
+        return {
+          id: sender.user_id,
+          name: sender.full_name,
+          role: sender.role || "Professional",
+          location: sender.location || "Location not specified",
+          skills: sender.skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
+          connectionId: conn.id,
+          status: conn.status
+        };
+      }).filter(Boolean) as ConnectionProfile[];
       
       setConnections(acceptedConnections);
       setPendingSent(formattedSent);
