@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Map, ChevronDown, Loader2 } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSession } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const SearchPage = () => {
@@ -35,12 +34,15 @@ const SearchPage = () => {
     setIsSearching(true);
     
     try {
+      // Get current session for authorization
+      const session = await getSession();
+      
       // Call the AI search edge function
       const response = await fetch(`https://dvdkihicwovcfbwlfmrk.supabase.co/functions/v1/ai-search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
           query: query
@@ -94,14 +96,13 @@ const SearchPage = () => {
   const fetchAllUsers = async () => {
     try {
       // Basic user search in the database
-      let { data: users, error } = await supabase
+      const { data: users, error } = await supabase
         .from('users')
         .select(`
           user_id,
           full_name,
-          role,
-          location,
           bio,
+          location,
           skills:user_skills(skill:skills(skill_name))
         `)
         .neq('user_id', user?.id); // Exclude current user
@@ -116,7 +117,7 @@ const SearchPage = () => {
         return {
           id: user.user_id,
           name: user.full_name,
-          role: user.role || "Professional",
+          role: "Professional", // Default role since it doesn't exist in the database
           location: user.location || "Location not specified",
           skills: skills,
           bio: user.bio || "No bio available",

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,11 +12,31 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 
+interface UserProfile {
+  id: string;
+  name: string;
+  role?: string; // Make role optional
+  location?: string;
+  bio?: string;
+  skills: string[];
+  email: string;
+  profileVisibility: string;
+  networkingIntent: string;
+  workingStyle: string;
+  availability: string;
+  portfolioUrl: string;
+  linkedinUrl: string;
+  githubUrl: string;
+  connections: number;
+  profileViews: number;
+  blockedUsers: any[];
+}
+
 const ProfilePage = () => {
   const { user } = useAuth();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const navigate = useNavigate();
-  const [userData, setUserData] = useState({
+  const [userData, setUserData] = useState<UserProfile>({
     id: "",
     name: "",
     role: "",
@@ -64,7 +83,7 @@ const ProfilePage = () => {
       const { data: userProfile, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .single();
 
       if (userError) throw userError;
@@ -73,7 +92,7 @@ const ProfilePage = () => {
       const { data: userSkills, error: skillsError } = await supabase
         .from('user_skills')
         .select('skill:skills(skill_name)')
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id);
 
       if (skillsError) throw skillsError;
 
@@ -81,7 +100,7 @@ const ProfilePage = () => {
       const { data: socialProfiles, error: socialError } = await supabase
         .from('social_profiles')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id);
 
       if (socialError) throw socialError;
 
@@ -99,14 +118,17 @@ const ProfilePage = () => {
       // Map the skills array to just the name strings
       const skills = userSkills.map(item => item.skill.skill_name);
 
+      // Create a default role if one doesn't exist in the database
+      const role = "Professional Role Not Set"; // Default value
+
       setUserData({
-        id: user.id,
+        id: user?.id || "",
         name: userProfile.full_name,
-        role: userProfile.role || "Professional Role Not Set",
+        role: role, // Use default or custom role
         location: userProfile.location || "Location Not Set",
         bio: userProfile.bio || "No bio added yet",
         skills: skills,
-        email: user.email,
+        email: user?.email || "",
         profileVisibility: "public", // Default values if not available in DB
         networkingIntent: "cofounder",
         workingStyle: "remote",
@@ -122,7 +144,7 @@ const ProfilePage = () => {
       // Set form data for edit dialog
       setFormData({
         full_name: userProfile.full_name,
-        role: userProfile.role || "",
+        role: role, // Use default or custom role
         location: userProfile.location || "",
         bio: userProfile.bio || "",
         profileVisibility: "public",
@@ -139,7 +161,7 @@ const ProfilePage = () => {
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
@@ -155,12 +177,11 @@ const ProfilePage = () => {
         .from('users')
         .update({
           full_name: formData.full_name,
-          role: formData.role,
           location: formData.location,
           bio: formData.bio,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(), // Convert to ISO string to match expected type
         })
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id);
 
       if (profileError) throw profileError;
 
@@ -169,14 +190,14 @@ const ProfilePage = () => {
       await supabase
         .from('social_profiles')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id);
 
       // Then insert new profiles if URLs are provided
       const socialProfilesToInsert = [];
       
       if (formData.portfolioUrl) {
         socialProfilesToInsert.push({
-          user_id: user.id,
+          user_id: user?.id,
           platform: 'portfolio',
           profile_url: formData.portfolioUrl,
         });
@@ -184,7 +205,7 @@ const ProfilePage = () => {
       
       if (formData.linkedinUrl) {
         socialProfilesToInsert.push({
-          user_id: user.id,
+          user_id: user?.id,
           platform: 'linkedin',
           profile_url: formData.linkedinUrl,
         });
@@ -192,7 +213,7 @@ const ProfilePage = () => {
       
       if (formData.githubUrl) {
         socialProfilesToInsert.push({
-          user_id: user.id,
+          user_id: user?.id,
           platform: 'github',
           profile_url: formData.githubUrl,
         });
