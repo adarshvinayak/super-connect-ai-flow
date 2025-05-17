@@ -1,8 +1,5 @@
 
 project_id = "dvdkihicwovcfbwlfmrk"
 
-[functions.ai-match-analyze]
-verify_jwt = true
-
-[functions.ai-search]
+[functions.cv-parser]
 verify_jwt = true

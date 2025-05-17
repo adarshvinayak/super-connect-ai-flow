@@ -1,94 +1,153 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Map, ChevronDown } from "lucide-react";
+import { Search, Filter, Map, ChevronDown, Loader2 } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-// Dummy data for demo purposes
-const dummyUsers = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    role: "Frontend Developer",
-    location: "San Francisco, CA",
-    skills: ["React", "TypeScript", "UI/UX"],
-    bio: "Frontend developer specializing in React and TypeScript. Looking for co-founding opportunities in the AI space.",
-    networkingIntent: "cofounder"
-  },
-  {
-    id: "2",
-    name: "Taylor Smith",
-    role: "Product Manager",
-    location: "New York, NY",
-    skills: ["Product Strategy", "User Research", "Agile"],
-    bio: "Experienced product manager with a track record of launching successful SaaS products. Looking for technical co-founders.",
-    networkingIntent: "cofounder"
-  },
-  {
-    id: "3",
-    name: "Jamie Rivera",
-    role: "Marketing Specialist",
-    location: "Austin, TX",
-    skills: ["Content Strategy", "SEO", "Social Media"],
-    bio: "Growth marketer with a passion for helping startups scale. Seeking partners with technical skills.",
-    networkingIntent: "client"
-  },
-  {
-    id: "4",
-    name: "Morgan Lee",
-    role: "UX Designer",
-    location: "Seattle, WA",
-    skills: ["UI Design", "User Research", "Figma"],
-    bio: "UX designer focused on creating beautiful, intuitive interfaces. Looking to collaborate with developers on client projects.",
-    networkingIntent: "client"
-  },
-  {
-    id: "5",
-    name: "Casey Wong",
-    role: "Project Manager",
-    location: "Chicago, IL",
-    skills: ["Agile", "Scrum", "Team Leadership"],
-    bio: "Experienced project manager seeking talented developers to join our team for ongoing client work.",
-    networkingIntent: "teammate"
-  },
-  {
-    id: "6",
-    name: "Jordan Taylor",
-    role: "CTO",
-    location: "Boston, MA",
-    skills: ["System Architecture", "Team Building", "Strategic Planning"],
-    bio: "CTO of a growing startup looking to expand our engineering team with talented developers.",
-    networkingIntent: "teammate"
-  },
-];
+interface UserResult {
+  user_id: string;
+  full_name: string;
+  role: string | null;
+  location: string | null;
+  bio: string | null;
+  skills: { skill_name: string }[];
+  networking_intent: string | null;
+}
 
 const SearchPage = () => {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState(dummyUsers);
+  const [results, setResults] = useState<UserResult[]>([]);
+  const [allUsers, setAllUsers] = useState<UserResult[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     intent: "all",
     location: "all",
     sortBy: "relevance"
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [locations, setLocations] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
+  
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select(`
+          user_id,
+          full_name,
+          role,
+          location,
+          bio,
+          skills:user_skills(skill:skills(skill_name)),
+          networking_intent:user_intents(intent:intents(intent_name))
+        `)
+        .neq('user_id', user?.id); // Exclude current user
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      if (!userData) {
+        setAllUsers([]);
+        setResults([]);
+        return;
+      }
+      
+      // Process the data to format skills and networking intent
+      const processedUsers = userData.map(user => {
+        // Get skill names
+        const skills = (user.skills || []).map((skillEntry: any) => ({
+          skill_name: skillEntry.skill?.skill_name || "Unknown"
+        }));
+        
+        // Get networking intent
+        const networking_intent = user.networking_intent && user.networking_intent.length > 0 
+          ? user.networking_intent[0]?.intent?.intent_name
+          : null;
+        
+        return {
+          ...user,
+          skills,
+          networking_intent
+        };
+      });
+      
+      // Extract unique locations for the filter
+      const uniqueLocations = Array.from(
+        new Set(
+          processedUsers
+            .filter(user => user.location)
+            .map(user => user.location)
+        )
+      ) as string[];
+      
+      setLocations(uniqueLocations);
+      setAllUsers(processedUsers);
+      setResults(processedUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("Failed to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    applyFiltersAndSearch();
+  };
+  
+  const applyFiltersAndSearch = () => {
+    let filtered = [...allUsers];
     
-    if (!query.trim()) {
-      setResults(dummyUsers);
-      return;
+    // Apply search query if exists
+    if (query.trim()) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter(user => {
+        const fullName = user.full_name?.toLowerCase() || "";
+        const role = user.role?.toLowerCase() || "";
+        const location = user.location?.toLowerCase() || "";
+        const bio = user.bio?.toLowerCase() || "";
+        const skills = user.skills.map(s => s.skill_name.toLowerCase()).join(" ");
+        
+        return (
+          fullName.includes(lowerQuery) ||
+          role.includes(lowerQuery) ||
+          location.includes(lowerQuery) ||
+          bio?.includes(lowerQuery) ||
+          skills.includes(lowerQuery)
+        );
+      });
     }
     
-    // Simple search implementation for the demo
-    const filtered = dummyUsers.filter(user => {
-      const searchString = `${user.name} ${user.role} ${user.location} ${user.bio} ${user.skills.join(" ")}`.toLowerCase();
-      return searchString.includes(query.toLowerCase());
-    });
+    // Filter by intent
+    if (filters.intent !== "all") {
+      filtered = filtered.filter(user => user.networking_intent === filters.intent);
+    }
+    
+    // Filter by location
+    if (filters.location !== "all") {
+      filtered = filtered.filter(user => user.location === filters.location);
+    }
+    
+    // Sort results
+    if (filters.sortBy === "name") {
+      filtered.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    }
     
     setResults(filtered);
   };
@@ -97,34 +156,8 @@ const SearchPage = () => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Apply filters
-    let filtered = [...dummyUsers];
-    
-    // Filter by intent
-    if (newFilters.intent !== "all") {
-      filtered = filtered.filter(user => user.networkingIntent === newFilters.intent);
-    }
-    
-    // Filter by location (simplified for demo)
-    if (newFilters.location !== "all") {
-      filtered = filtered.filter(user => user.location.includes(newFilters.location));
-    }
-    
-    // Apply search query if exists
-    if (query.trim()) {
-      filtered = filtered.filter(user => {
-        const searchString = `${user.name} ${user.role} ${user.location} ${user.bio} ${user.skills.join(" ")}`.toLowerCase();
-        return searchString.includes(query.toLowerCase());
-      });
-    }
-    
-    // Sort results
-    if (newFilters.sortBy === "name") {
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    // Add other sorting options as needed
-    
-    setResults(filtered);
+    // We'll apply filters in the next render cycle
+    setTimeout(() => applyFiltersAndSearch(), 0);
   };
   
   return (
@@ -203,12 +236,11 @@ const SearchPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Locations</SelectItem>
-                    <SelectItem value="San Francisco">San Francisco</SelectItem>
-                    <SelectItem value="New York">New York</SelectItem>
-                    <SelectItem value="Austin">Austin</SelectItem>
-                    <SelectItem value="Seattle">Seattle</SelectItem>
-                    <SelectItem value="Chicago">Chicago</SelectItem>
-                    <SelectItem value="Boston">Boston</SelectItem>
+                    {locations.map(location => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -236,7 +268,8 @@ const SearchPage = () => {
                 size="sm"
                 onClick={() => {
                   setFilters({ intent: "all", location: "all", sortBy: "relevance" });
-                  setResults(dummyUsers);
+                  setQuery("");
+                  setResults(allUsers);
                 }}
               >
                 Reset Filters
@@ -247,51 +280,65 @@ const SearchPage = () => {
       </div>
       
       {/* Search Results */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {results.length > 0 ? (
-          results.map((user) => (
-            <Card key={user.id} className="card-hover">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between">
-                  <div>
-                    <CardTitle>{user.name}</CardTitle>
-                    <CardDescription>{user.role}</CardDescription>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {results.length > 0 ? (
+            results.map((user) => (
+              <Card key={user.user_id} className="card-hover">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between">
+                    <div>
+                      <CardTitle>{user.full_name}</CardTitle>
+                      <CardDescription>{user.role || "No role specified"}</CardDescription>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm text-gray-500 mb-3">
-                  <Map className="h-4 w-4 mr-1" />
-                  {user.location}
-                </div>
-                
-                <p className="text-gray-700 mb-4 line-clamp-2">{user.bio}</p>
-                
-                <div className="flex flex-wrap gap-1">
-                  {user.skills.map((skill) => (
-                    <Badge key={skill} variant="secondary">{skill}</Badge>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" size="sm" className="mr-2" asChild>
-                  <Link to={`/profile/${user.id}`}>View Profile</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link to={`/messaging/${user.id}`}>Connect</Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))
-        ) : (
-          <div className="col-span-full text-center py-12">
-            <p className="text-lg font-medium">No results found</p>
-            <p className="text-gray-500 mt-1">
-              Try adjusting your search or filters to find more people
-            </p>
-          </div>
-        )}
-      </div>
+                </CardHeader>
+                <CardContent>
+                  {user.location && (
+                    <div className="flex items-center text-sm text-gray-500 mb-3">
+                      <Map className="h-4 w-4 mr-1" />
+                      {user.location}
+                    </div>
+                  )}
+                  
+                  {user.bio && (
+                    <p className="text-gray-700 mb-4 line-clamp-2">{user.bio}</p>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-1">
+                    {user.skills && user.skills.length > 0 ? (
+                      user.skills.map((skill, index) => (
+                        <Badge key={`${user.user_id}-${index}`} variant="secondary">{skill.skill_name}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500">No skills listed</span>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" size="sm" className="mr-2" asChild>
+                    <Link to={`/profile/${user.user_id}`}>View Profile</Link>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link to={`/messaging/${user.user_id}`}>Connect</Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <p className="text-lg font-medium">No results found</p>
+              <p className="text-gray-500 mt-1">
+                Try adjusting your search or filters to find more people
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
