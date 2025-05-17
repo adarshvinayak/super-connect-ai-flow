@@ -6,99 +6,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, X, Check, User } from "lucide-react";
-
-// Dummy data for connected users
-const connectedUsers = [
-  {
-    id: "1",
-    name: "Jamie Rivera",
-    role: "Marketing Specialist",
-    location: "Austin, TX",
-    skills: ["Content Strategy", "SEO", "Social Media"],
-    connectionDate: "Jun 15, 2023",
-    avatar: "J"
-  },
-  {
-    id: "2",
-    name: "Morgan Lee",
-    role: "UX Designer",
-    location: "Seattle, WA",
-    skills: ["UI Design", "User Research", "Figma"],
-    connectionDate: "Aug 22, 2023",
-    avatar: "M"
-  },
-  {
-    id: "3",
-    name: "Casey Wong",
-    role: "Project Manager",
-    location: "Chicago, IL",
-    skills: ["Agile", "Scrum", "Team Leadership"],
-    connectionDate: "Oct 5, 2023",
-    avatar: "C"
-  },
-];
-
-// Dummy data for pending requests
-const pendingRequests = [
-  {
-    id: "4",
-    name: "Alex Johnson",
-    role: "Frontend Developer",
-    location: "San Francisco, CA",
-    skills: ["React", "TypeScript", "UI/UX"],
-    requestDate: "2 days ago",
-    type: "received", // received or sent
-    avatar: "A"
-  },
-  {
-    id: "5",
-    name: "Taylor Smith",
-    role: "Product Manager",
-    location: "New York, NY",
-    skills: ["Product Strategy", "User Research", "Agile"],
-    requestDate: "1 week ago",
-    type: "sent",
-    avatar: "T"
-  },
-  {
-    id: "6",
-    name: "Jordan Taylor",
-    role: "CTO",
-    location: "Boston, MA",
-    skills: ["System Architecture", "Team Building", "Strategic Planning"],
-    requestDate: "3 days ago",
-    type: "received",
-    avatar: "J"
-  },
-];
+import { useConnections } from "@/hooks/useConnections";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const ConnectionsPage = () => {
-  const [connections, setConnections] = useState(connectedUsers);
-  const [requests, setRequests] = useState(pendingRequests);
+  const { connections, receivedRequests, sentRequests, acceptConnectionRequest, rejectConnectionRequest, cancelConnectionRequest } = useConnections();
+  const { fetchProfile } = useUserProfile();
+  const [connectionProfiles, setConnectionProfiles] = useState<{[key: string]: any}>({});
   
-  const handleAcceptRequest = (id: string) => {
-    const acceptedRequest = requests.find(req => req.id === id);
-    if (acceptedRequest) {
-      // Remove from requests
-      setRequests(prevRequests => prevRequests.filter(req => req.id !== id));
-      
-      // Add to connections
-      setConnections(prevConnections => [
-        ...prevConnections,
-        {
-          ...acceptedRequest,
-          connectionDate: "Just now"
-        }
-      ]);
+  // Fetch profile details for a connection
+  const getConnectionProfile = async (userId: string) => {
+    if (connectionProfiles[userId]) {
+      return connectionProfiles[userId];
     }
-  };
-  
-  const handleDeclineRequest = (id: string) => {
-    setRequests(prevRequests => prevRequests.filter(req => req.id !== id));
-  };
-  
-  const handleCancelRequest = (id: string) => {
-    setRequests(prevRequests => prevRequests.filter(req => req.id !== id));
+    
+    const profile = await fetchProfile(userId);
+    if (profile) {
+      setConnectionProfiles(prev => ({ ...prev, [userId]: profile }));
+      return profile;
+    }
+    
+    return null;
   };
   
   return (
@@ -111,57 +39,74 @@ const ConnectionsPage = () => {
             Connections ({connections.length})
           </TabsTrigger>
           <TabsTrigger value="pending">
-            Pending Requests ({requests.length})
+            Pending Requests ({receivedRequests.length + sentRequests.length})
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="connections" className="mt-6">
           {connections.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {connections.map(connection => (
-                <Card key={connection.id} className="card-hover">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
-                        {connection.avatar}
+              {connections.map(connection => {
+                // Determine which user in the connection is not the current user
+                const isUserSender = connection.senderId !== connection.receiverId;
+                const otherUserId = isUserSender ? connection.receiverId : connection.senderId;
+                const otherUserName = isUserSender ? connection.receiverName : connection.senderName;
+                
+                // Get profile info if available
+                const profile = connectionProfiles[otherUserId];
+                
+                return (
+                  <Card key={connection.id} className="card-hover">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
+                          {otherUserName?.charAt(0) || 'U'}
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{otherUserName}</CardTitle>
+                          <CardDescription>{profile?.role || 'Connection'}</CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{connection.name}</CardTitle>
-                        <CardDescription>{connection.role}</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <p className="text-sm text-gray-500 mb-2">
-                      {connection.location}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {connection.skills.map(skill => (
-                        <Badge key={skill} variant="secondary" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Connected since {connection.connectionDate}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/profile/${connection.id}`}>
-                        <User className="h-4 w-4 mr-1" />
-                        Profile
-                      </Link>
-                    </Button>
-                    <Button size="sm" asChild>
-                      <Link to={`/messaging/${connection.id}`}>
-                        <MessageCircle className="h-4 w-4 mr-1" />
-                        Message
-                      </Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      {profile?.location && (
+                        <p className="text-sm text-gray-500 mb-2">
+                          {profile.location}
+                        </p>
+                      )}
+                      {profile?.skills && profile.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {profile.skills.slice(0, 3).map(skill => (
+                            <Badge key={skill} variant="secondary" className="text-xs">
+                              {skill}
+                            </Badge>
+                          ))}
+                          {profile.skills.length > 3 && (
+                            <Badge variant="outline" className="text-xs">+{profile.skills.length - 3} more</Badge>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        Connected since {new Date(connection.createdAt).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/profile/${otherUserId}`}>
+                          <User className="h-4 w-4 mr-1" />
+                          Profile
+                        </Link>
+                      </Button>
+                      <Button size="sm" asChild>
+                        <Link to={`/messaging/${otherUserId}`}>
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          Message
+                        </Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-10">
@@ -179,38 +124,46 @@ const ConnectionsPage = () => {
         <TabsContent value="pending" className="mt-6">
           <div className="space-y-6">
             {/* Received requests */}
-            {requests.filter(req => req.type === "received").length > 0 && (
+            {receivedRequests.length > 0 && (
               <div>
                 <h3 className="font-medium text-lg mb-4">Requests Received</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {requests
-                    .filter(req => req.type === "received")
-                    .map(request => (
+                  {receivedRequests.map(request => {
+                    const profile = connectionProfiles[request.senderId];
+                    
+                    return (
                       <Card key={request.id}>
                         <CardHeader className="pb-2">
                           <div className="flex items-center">
                             <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
-                              {request.avatar}
+                              {request.senderName?.charAt(0) || 'U'}
                             </div>
                             <div>
-                              <CardTitle className="text-lg">{request.name}</CardTitle>
-                              <CardDescription>{request.role}</CardDescription>
+                              <CardTitle className="text-lg">{request.senderName}</CardTitle>
+                              <CardDescription>{profile?.role || 'Sent you a request'}</CardDescription>
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="pb-2">
-                          <p className="text-sm text-gray-500 mb-2">
-                            {request.location}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {request.skills.map(skill => (
-                              <Badge key={skill} variant="secondary" className="text-xs">
-                                {skill}
-                              </Badge>
-                            ))}
-                          </div>
+                          {profile?.location && (
+                            <p className="text-sm text-gray-500 mb-2">
+                              {profile.location}
+                            </p>
+                          )}
+                          {profile?.skills && profile.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {profile.skills.slice(0, 3).map(skill => (
+                                <Badge key={skill} variant="secondary" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {profile.skills.length > 3 && (
+                                <Badge variant="outline" className="text-xs">+{profile.skills.length - 3} more</Badge>
+                              )}
+                            </div>
+                          )}
                           <p className="text-xs text-gray-500">
-                            Requested {request.requestDate}
+                            Requested {new Date(request.createdAt).toLocaleDateString()}
                           </p>
                         </CardContent>
                         <CardFooter>
@@ -219,7 +172,7 @@ const ConnectionsPage = () => {
                               size="sm"
                               variant="outline"
                               className="flex-1 mr-2"
-                              onClick={() => handleDeclineRequest(request.id)}
+                              onClick={() => rejectConnectionRequest(request.id)}
                             >
                               <X className="h-4 w-4 mr-1" />
                               Decline
@@ -227,7 +180,7 @@ const ConnectionsPage = () => {
                             <Button
                               size="sm"
                               className="flex-1"
-                              onClick={() => handleAcceptRequest(request.id)}
+                              onClick={() => acceptConnectionRequest(request.id)}
                             >
                               <Check className="h-4 w-4 mr-1" />
                               Accept
@@ -235,44 +188,50 @@ const ConnectionsPage = () => {
                           </div>
                         </CardFooter>
                       </Card>
-                    ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
             
             {/* Sent requests */}
-            {requests.filter(req => req.type === "sent").length > 0 && (
+            {sentRequests.length > 0 && (
               <div className="mt-8">
                 <h3 className="font-medium text-lg mb-4">Requests Sent</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {requests
-                    .filter(req => req.type === "sent")
-                    .map(request => (
+                  {sentRequests.map(request => {
+                    const profile = connectionProfiles[request.receiverId];
+                    
+                    return (
                       <Card key={request.id}>
                         <CardHeader className="pb-2">
                           <div className="flex items-center">
                             <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
-                              {request.avatar}
+                              {request.receiverName?.charAt(0) || 'U'}
                             </div>
                             <div>
-                              <CardTitle className="text-lg">{request.name}</CardTitle>
-                              <CardDescription>{request.role}</CardDescription>
+                              <CardTitle className="text-lg">{request.receiverName}</CardTitle>
+                              <CardDescription>{profile?.role || 'Pending request'}</CardDescription>
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="pb-2">
-                          <p className="text-sm text-gray-500 mb-2">
-                            {request.location}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {request.skills.map(skill => (
-                              <Badge key={skill} variant="secondary" className="text-xs">
-                                {skill}
-                              </Badge>
-                            ))}
-                          </div>
+                          {profile?.location && (
+                            <p className="text-sm text-gray-500 mb-2">
+                              {profile.location}
+                            </p>
+                          )}
+                          {profile?.skills && profile.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {profile.skills.slice(0, 3).map(skill => (
+                                <Badge key={skill} variant="secondary" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                           <p className="text-xs text-gray-500">
-                            Sent {request.requestDate}
+                            Sent {new Date(request.createdAt).toLocaleDateString()}
                           </p>
                         </CardContent>
                         <CardFooter>
@@ -283,7 +242,7 @@ const ConnectionsPage = () => {
                               asChild
                               className="flex-1 mr-2"
                             >
-                              <Link to={`/profile/${request.id}`}>
+                              <Link to={`/profile/${request.receiverId}`}>
                                 <User className="h-4 w-4 mr-1" />
                                 View Profile
                               </Link>
@@ -292,7 +251,7 @@ const ConnectionsPage = () => {
                               size="sm"
                               variant="ghost"
                               className="flex-1 text-gray-600 hover:text-gray-900"
-                              onClick={() => handleCancelRequest(request.id)}
+                              onClick={() => cancelConnectionRequest(request.id)}
                             >
                               <X className="h-4 w-4 mr-1" />
                               Cancel
@@ -300,12 +259,13 @@ const ConnectionsPage = () => {
                           </div>
                         </CardFooter>
                       </Card>
-                    ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
             
-            {requests.length === 0 && (
+            {receivedRequests.length === 0 && sentRequests.length === 0 && (
               <div className="text-center py-10">
                 <h3 className="text-lg font-medium mb-2">No pending requests</h3>
                 <p className="text-gray-500 mb-4">
