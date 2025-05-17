@@ -1,6 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Define a type for the user object returned by Supabase auth.admin.listUsers
+interface SupabaseUser {
+  id: string;
+  email?: string;
+  [key: string]: any; // For other properties that might be present
+}
+
 /**
  * Removes any dummy test user accounts from the authentication system that match a known test pattern
  * For safety, this only removes users that have emails matching the test pattern
@@ -25,7 +32,9 @@ export async function removeDummyUsers() {
     }
     
     // Filter users with test emails
-    const testUsers = data.users.filter(user => {
+    // Explicitly type the users array to avoid 'never' type inference
+    const users = data.users as SupabaseUser[];
+    const testUsers = users.filter(user => {
       // Only target specific test users with a clear pattern to avoid removing real users
       // Ensure user and user.email are defined
       if (!user || !user.email) return false;
