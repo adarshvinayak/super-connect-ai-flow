@@ -74,10 +74,15 @@ export function useMessaging() {
       messagesData.forEach(msg => {
         const isCurrentUserSender = msg.sender_id === user.id;
         const otherUserId = isCurrentUserSender ? msg.receiver_id : msg.sender_id;
-        // Use type assertion and provide fallback for potentially undefined properties
+        
+        // Create type assertions for sender and receiver to handle potential null/undefined values
+        const sender = msg.sender as { full_name?: string } | null;
+        const receiver = msg.receiver as { full_name?: string } | null;
+        
+        // Use the type-asserted variables
         const otherUserName = isCurrentUserSender 
-          ? (msg.receiver?.full_name as string || 'Unknown User')
-          : (msg.sender?.full_name as string || 'Unknown User');
+          ? (receiver?.full_name || 'Unknown User')
+          : (sender?.full_name || 'Unknown User');
 
         if (!userConversations.has(otherUserId)) {
           userConversations.set(otherUserId, {
@@ -136,17 +141,22 @@ export function useMessaging() {
       }
 
       // Format messages
-      const formattedMessages: Message[] = data.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        senderId: msg.sender_id,
-        receiverId: msg.receiver_id,
-        createdAt: msg.created_at,
-        read: msg.read,
-        // Use type assertion and provide fallback for potentially undefined properties
-        senderName: msg.sender?.full_name as string || 'Unknown User',
-        receiverName: msg.receiver?.full_name as string || 'Unknown User'
-      }));
+      const formattedMessages: Message[] = data.map(msg => {
+        // Create type assertions for sender and receiver
+        const sender = msg.sender as { full_name?: string } | null;
+        const receiver = msg.receiver as { full_name?: string } | null;
+        
+        return {
+          id: msg.id,
+          content: msg.content,
+          senderId: msg.sender_id,
+          receiverId: msg.receiver_id,
+          createdAt: msg.created_at,
+          read: msg.read,
+          senderName: sender?.full_name || 'Unknown User',
+          receiverName: receiver?.full_name || 'Unknown User'
+        };
+      });
 
       setMessages(formattedMessages);
 

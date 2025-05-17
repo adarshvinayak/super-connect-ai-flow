@@ -49,17 +49,22 @@ export function useConnections() {
 
       if (connectionError) throw connectionError;
 
-      const connections = connectionData.map(conn => ({
-        id: conn.id,
-        senderId: conn.sender_id,
-        receiverId: conn.receiver_id,
-        status: conn.status,
-        createdAt: conn.created_at,
-        updatedAt: conn.updated_at,
-        // Safely access potentially missing properties
-        senderName: conn.sender?.full_name as string || 'Unknown User',
-        receiverName: conn.receiver?.full_name as string || 'Unknown User'
-      }));
+      const connections = connectionData.map(conn => {
+        // Create type assertions for sender and receiver to handle potential null/undefined values
+        const sender = conn.sender as { full_name?: string } | null;
+        const receiver = conn.receiver as { full_name?: string } | null;
+        
+        return {
+          id: conn.id,
+          senderId: conn.sender_id,
+          receiverId: conn.receiver_id,
+          status: conn.status,
+          createdAt: conn.created_at,
+          updatedAt: conn.updated_at,
+          senderName: sender?.full_name || 'Unknown User',
+          receiverName: receiver?.full_name || 'Unknown User'
+        };
+      });
 
       // Filter by status and role
       const accepted = connections.filter(conn => conn.status === 'accepted');
