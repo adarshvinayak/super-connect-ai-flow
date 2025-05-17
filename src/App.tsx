@@ -29,27 +29,25 @@ function App() {
     }
   
     return (
-      
-        
-          <Navbar />
-          
-            <Sidebar />
-            
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/connections" element={<ConnectionsPage />} />
-                <Route path="/messaging/:id?" element={<MessagingPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/profile/:id" element={<ViewProfilePage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/onboarding" element={<OnboardingPage />} />
-              </Routes>
-            
-          
-        
-      
+      <div className="flex flex-col h-screen">
+        <Navbar />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-auto p-4">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/connections" element={<ConnectionsPage />} />
+              <Route path="/messaging/:id?" element={<MessagingPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/:id" element={<ViewProfilePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
+            </Routes>
+          </main>
+        </div>
+      </div>
     );
   };
   
@@ -74,66 +72,64 @@ function App() {
   };
 
   return (
-    
-      <Router>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <AuthSection type="login" />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <PublicRoute>
-                <AuthSection type="register" />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/forgot-password"
-            element={
-              <PublicRoute>
-                <AuthSection type="forgot-password" />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/reset-password"
-            element={
-              <PublicRoute>
-                <AuthSection type="reset-password" />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="*"
-            element={
-              <AuthRequired>
-                <AuthRoutes />
-              </AuthRequired>
-            }
-          />
-        </Routes>
-        <Toaster />
-      </Router>
-    
+    <Router>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <AuthSection type="login" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <AuthSection type="register" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute>
+              <AuthSection type="forgot-password" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <PublicRoute>
+              <AuthSection type="reset-password" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <AuthRequired>
+              <AuthRoutes />
+            </AuthRequired>
+          }
+        />
+      </Routes>
+      <Toaster />
+    </Router>
   );
 }
 
 function AuthSection({ type }: { type: string }) {
   return (
-    
-      
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="w-full max-w-md">
         {type === "login" && <Login />}
         {type === "register" && <Register />}
         {type === "forgot-password" && <ForgotPassword />}
         {type === "reset-password" && <ResetPassword />}
-      
-    
+      </div>
+    </div>
   );
 }
 
