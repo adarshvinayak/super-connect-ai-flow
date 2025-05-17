@@ -1,104 +1,74 @@
 
-import {
-  LayoutDashboard,
-  MessageCircle,
-  Search,
-  Settings,
-  User,
-  Users,
-} from "lucide-react"
-import { useLocation } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom";
+import { 
+  Home, 
+  Users, 
+  Search, 
+  MessageCircle, 
+  User, 
+  Settings, 
+  LogOut 
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { buttonVariants } from "@/components/ui/button"
-import { Link } from "react-router-dom"
-
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-export function Sidebar({ className, ...props }: SidebarProps) {
+const Sidebar = () => {
   const location = useLocation();
-  const pathname = location.pathname;
+  const { signOut } = useAuth();
+
+  const navItems = [
+    { name: "Dashboard", icon: Home, href: "/dashboard" },
+    { name: "Network", icon: Users, href: "/connections" },
+    { name: "Search", icon: Search, href: "/search" },
+    { name: "Messages", icon: MessageCircle, href: "/messaging" },
+    { name: "Profile", icon: User, href: "/profile" },
+    { name: "Settings", icon: Settings, href: "/settings" },
+  ];
 
   return (
-    <div
-      className="flex h-full w-64 flex-col border-r bg-secondary"
-      {...props}
-    >
-      <div className="flex-1 space-y-2 p-2">
-        <Link to="/" className="grid h-12 place-items-center p-3 font-semibold">
-          SuperNet
+    <div className="hidden md:flex h-screen w-64 flex-col bg-white border-r border-gray-200 shadow-sm">
+      <div className="flex items-center justify-center h-16 border-b border-gray-200">
+        <Link to="/dashboard" className="flex items-center">
+          <span className="text-2xl font-bold gradient-text">SuperNetworkAI</span>
         </Link>
-        <ScrollArea className="py-2">
-          <nav className="grid items-start px-2 text-sm font-medium">
+      </div>
+
+      <div className="flex flex-col justify-between flex-1 px-4 py-6">
+        <nav className="space-y-2">
+          {navItems.map((item) => (
             <Link
-              to="/dashboard"
-              className={buttonVariants({
-                variant: pathname === "/dashboard" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
+              key={item.name}
+              to={item.href}
+              className={cn(
+                "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                location.pathname === item.href
+                  ? "bg-supernet-lightpurple text-supernet-purple"
+                  : "text-gray-600 hover:bg-gray-100"
+              )}
             >
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
+              <item.icon className={cn(
+                "mr-3 h-5 w-5",
+                location.pathname === item.href ? "text-supernet-purple" : "text-gray-500"
+              )} />
+              {item.name}
             </Link>
-            <Link
-              to="/search"
-              className={buttonVariants({
-                variant: pathname === "/search" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
-            >
-              <Search className="mr-2 h-4 w-4" />
-              Search
-            </Link>
-            <Link
-              to="/connections"
-              className={buttonVariants({
-                variant: pathname === "/connections" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Network
-            </Link>
-            <Link
-              to="/messaging"
-              className={buttonVariants({
-                variant: pathname === "/messaging" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
-            >
-              <MessageCircle className="mr-2 h-4 w-4" />
-              Messaging
-            </Link>
-            <Link
-              to="/profile"
-              className={buttonVariants({
-                variant: pathname === "/profile" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
-            >
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </Link>
-            <Link
-              to="/settings"
-              className={buttonVariants({
-                variant: pathname === "/settings" ? "default" : "ghost",
-                size: "sm",
-                className: "justify-start",
-              })}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Link>
-          </nav>
-        </ScrollArea>
+          ))}
+        </nav>
+
+        <div className="mt-auto">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start px-4 py-3 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100"
+            onClick={() => signOut()}
+          >
+            <LogOut className="mr-3 h-5 w-5 text-gray-500" />
+            Sign Out
+          </Button>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default Sidebar;
