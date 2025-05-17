@@ -41,22 +41,19 @@ export function useMessaging() {
     setIsLoading(true);
 
     try {
-      // Since there might be an issue with the RPC, let's implement a direct query approach
-      // Get all messages for the current user
+      // Use the messages table instead of chat_messages
       const { data: messagesData, error: messagesError } = await supabase
-        .from('chat_messages')
+        .from('messages')
         .select(`
           id,
           content,
           sender_id,
           receiver_id,
-          created_at,
-          read,
-          sender:sender_id(user_id, full_name),
-          receiver:receiver_id(user_id, full_name)
+          timestamp as created_at,
+          is_read as read
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+        .order('timestamp', { ascending: false });
 
       if (messagesError) throw messagesError;
 
@@ -67,6 +64,29 @@ export function useMessaging() {
         return;
       }
 
+      // Get user names separately
+      const uniqueUserIds = new Set<string>();
+      messagesData.forEach(msg => {
+        if (msg.sender_id !== user.id) uniqueUserIds.add(msg.sender_id);
+        if (msg.receiver_id !== user.id) uniqueUserIds.add(msg.receiver_id);
+      });
+
+      const userIdArray = Array.from(uniqueUserIds);
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('user_id, full_name')
+        .in('user_id', userIdArray);
+
+      if (usersError) throw usersError;
+
+      // Create a map of user_id to full_name
+      const userMap = new Map<string, string>();
+      if (usersData) {
+        usersData.forEach(user => {
+          userMap.set(user.user_id, user.full_name || 'Unknown User');
+        });
+      }
+
       // Build conversations from messages
       const userConversations = new Map<string, Conversation>();
       let totalUnread = 0;
@@ -74,15 +94,7 @@ export function useMessaging() {
       messagesData.forEach(msg => {
         const isCurrentUserSender = msg.sender_id === user.id;
         const otherUserId = isCurrentUserSender ? msg.receiver_id : msg.sender_id;
-        
-        // Create type assertions for sender and receiver to handle potential null/undefined values
-        const sender = msg.sender as { full_name?: string } | null;
-        const receiver = msg.receiver as { full_name?: string } | null;
-        
-        // Use the type-asserted variables
-        const otherUserName = isCurrentUserSender 
-          ? (receiver?.full_name || 'Unknown User')
-          : (sender?.full_name || 'Unknown User');
+        const otherUserName = userMap.get(otherUserId) || 'Unknown User';
 
         if (!userConversations.has(otherUserId)) {
           userConversations.set(otherUserId, {
@@ -119,19 +131,17 @@ export function useMessaging() {
       setMessages([]); // Clear previous messages
 
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('messages')
         .select(`
           id,
           content,
           sender_id,
           receiver_id,
-          created_at,
-          read,
-          sender:sender_id(user_id, full_name),
-          receiver:receiver_id(user_id, full_name)
+          timestamp as created_at,
+          is_read as read
         `)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
+        .order('timestamp', { ascending: true });
 
       if (error) throw error;
 
@@ -140,23 +150,40 @@ export function useMessaging() {
         return;
       }
 
-      // Format messages
-      const formattedMessages: Message[] = data.map(msg => {
-        // Create type assertions for sender and receiver
-        const sender = msg.sender as { full_name?: string } | null;
-        const receiver = msg.receiver as { full_name?: string } | null;
-        
-        return {
-          id: msg.id,
-          content: msg.content,
-          senderId: msg.sender_id,
-          receiverId: msg.receiver_id,
-          createdAt: msg.created_at,
-          read: msg.read,
-          senderName: sender?.full_name || 'Unknown User',
-          receiverName: receiver?.full_name || 'Unknown User'
-        };
+      // Get user names separately
+      const uniqueUserIds = new Set<string>();
+      data.forEach(msg => {
+        uniqueUserIds.add(msg.sender_id);
+        uniqueUserIds.add(msg.receiver_id);
       });
+
+      const userIdArray = Array.from(uniqueUserIds);
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('user_id, full_name')
+        .in('user_id', userIdArray);
+
+      if (usersError) throw usersError;
+
+      // Create a map of user_id to full_name
+      const userMap = new Map<string, string>();
+      if (usersData) {
+        usersData.forEach(user => {
+          userMap.set(user.user_id, user.full_name || 'Unknown User');
+        });
+      }
+
+      // Format messages
+      const formattedMessages: Message[] = data.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        senderId: msg.sender_id,
+        receiverId: msg.receiver_id,
+        createdAt: msg.created_at,
+        read: msg.read,
+        senderName: userMap.get(msg.sender_id) || 'Unknown User',
+        receiverName: userMap.get(msg.receiver_id) || 'Unknown User'
+      }));
 
       setMessages(formattedMessages);
 
@@ -167,8 +194,8 @@ export function useMessaging() {
 
       if (unreadMessages.length > 0) {
         const { error: updateError } = await supabase
-          .from('chat_messages')
-          .update({ read: true })
+          .from('messages')
+          .update({ is_read: true })
           .in('id', unreadMessages);
 
         if (updateError) {
@@ -190,12 +217,12 @@ export function useMessaging() {
 
     try {
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('messages')
         .insert({
           sender_id: user.id,
           receiver_id: receiverId,
           content: content.trim(),
-          read: false
+          is_read: false
         })
         .select()
         .single();
@@ -223,14 +250,13 @@ export function useMessaging() {
     if (!user) return;
 
     const channel = supabase
-      .channel('chat-messages')
+      .channel('messages-changes')
       .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' }, 
+        { event: 'INSERT', schema: 'public', table: 'messages' }, 
         (payload) => {
           // Type safety for new message
-          if (!payload.new) return;
-          
-          const newMessage = payload.new as Record<string, any>;
+          const newMessage = payload.new as Record<string, any> | null;
+          if (!newMessage) return;
           
           // Only process messages related to the current user
           if (newMessage.sender_id === user.id || newMessage.receiver_id === user.id) {

@@ -41,19 +41,35 @@ export function useConnections() {
           receiver_id,
           status,
           created_at,
-          updated_at,
-          sender:sender_id(user_id, full_name),
-          receiver:receiver_id(user_id, full_name)
+          updated_at
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
       if (connectionError) throw connectionError;
 
-      const connections = connectionData.map(conn => {
-        // Create type assertions for sender and receiver to handle potential null/undefined values
-        const sender = conn.sender as { full_name?: string } | null;
-        const receiver = conn.receiver as { full_name?: string } | null;
+      // Fetch users data separately to get names
+      const userIds: string[] = [];
+      connectionData.forEach(conn => {
+        if (conn.sender_id !== user.id) userIds.push(conn.sender_id);
+        if (conn.receiver_id !== user.id) userIds.push(conn.receiver_id);
+      });
+      
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
         
+      if (usersError) throw usersError;
+      
+      // Create a map of user IDs to names
+      const userMap = new Map<string, string>();
+      if (usersData) {
+        usersData.forEach(u => {
+          userMap.set(u.user_id, u.full_name || 'Unknown User');
+        });
+      }
+
+      const connections = connectionData.map(conn => {
         return {
           id: conn.id,
           senderId: conn.sender_id,
@@ -61,8 +77,8 @@ export function useConnections() {
           status: conn.status,
           createdAt: conn.created_at,
           updatedAt: conn.updated_at,
-          senderName: sender?.full_name || 'Unknown User',
-          receiverName: receiver?.full_name || 'Unknown User'
+          senderName: userMap.get(conn.sender_id) || 'Unknown User',
+          receiverName: userMap.get(conn.receiver_id) || 'Unknown User'
         };
       });
 
@@ -103,7 +119,7 @@ export function useConnections() {
       if (checkError) throw checkError;
 
       if (existingRequest && existingRequest.length > 0) {
-        const request = existingRequest[0];
+        const request = existingRequest[0] as Record<string, any>;
         
         if (request.status === 'accepted') {
           toast.info('You are already connected with this user');
@@ -238,18 +254,16 @@ export function useConnections() {
         { event: '*', schema: 'public', table: 'connection_requests' }, 
         (payload) => {
           // Type safety for payload
-          if (!payload.new && !payload.old) return;
-          
-          const newData = payload.new as Record<string, any> || {};
-          const oldData = payload.old as Record<string, any> || {};
+          const newData = payload.new as Record<string, any> | null;
+          const oldData = payload.old as Record<string, any> | null;
           
           // Only react to changes relevant to the current user
-          if ((newData.sender_id === user.id || newData.receiver_id === user.id || 
-              oldData.sender_id === user.id || oldData.receiver_id === user.id)) {
+          if ((newData && (newData.sender_id === user.id || newData.receiver_id === user.id)) || 
+              (oldData && (oldData.sender_id === user.id || oldData.receiver_id === user.id))) {
             fetchConnections();
             
             // Show notifications for new requests
-            if (payload.eventType === 'INSERT' && newData.receiver_id === user.id) {
+            if (payload.eventType === 'INSERT' && newData && newData.receiver_id === user.id) {
               // We'll need to get the sender's name
               const getSenderName = async () => {
                 const { data: userData } = await supabase

@@ -29,26 +29,61 @@ export function NotificationsPopover() {
     const fetchRecentActivity = async () => {
       if (!user) return;
       
-      const { data, error } = await supabase
-        .from('user_activity')
-        .select(`
-          id,
-          activity_type,
-          description,
-          entity_id,
-          created_at,
-          user:user_id(full_name)
-        `)
-        .neq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      try {
+        const { data, error } = await supabase
+          .from('user_activity')
+          .select(`
+            id,
+            activity_type,
+            description,
+            entity_id,
+            created_at,
+            user_id
+          `)
+          .neq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        if (error) {
+          console.error('Error fetching activity notifications:', error);
+          return;
+        }
         
-      if (error) {
-        console.error('Error fetching activity notifications:', error);
-        return;
+        // Fetch user names separately
+        const userIds = data ? data.map(activity => activity.user_id) : [];
+        if (userIds.length === 0) {
+          setActivityNotifications([]);
+          return;
+        }
+        
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('user_id, full_name')
+          .in('user_id', userIds);
+          
+        if (usersError) {
+          console.error('Error fetching user names:', usersError);
+          return;
+        }
+        
+        // Create a map of user IDs to names
+        const userMap = new Map<string, string>();
+        if (usersData) {
+          usersData.forEach(u => {
+            userMap.set(u.user_id, u.full_name || 'Unknown User');
+          });
+        }
+        
+        // Combine activity data with user names
+        const activitiesWithUserNames = data ? data.map(activity => ({
+          ...activity,
+          userName: userMap.get(activity.user_id) || 'Unknown User'
+        })) : [];
+        
+        setActivityNotifications(activitiesWithUserNames);
+      } catch (error) {
+        console.error('Error in fetchRecentActivity:', error);
       }
-      
-      setActivityNotifications(data || []);
     };
     
     fetchRecentActivity();
@@ -201,7 +236,7 @@ export function NotificationsPopover() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm">
-                          <span className="font-medium">{activity.user?.full_name || 'Someone'}</span>
+                          <span className="font-medium">{activity.userName || 'Someone'}</span>
                           {' '}
                           {activity.description.toLowerCase()}
                         </p>
