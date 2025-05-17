@@ -23,6 +23,20 @@ interface ConnectionProfile {
   status: string;
 }
 
+interface UserData {
+  user_id: string;
+  full_name: string;
+  role: string | null;
+  location: string | null;
+  skills: Array<{skill?: {skill_name: string}}>;
+}
+
+interface SkillData {
+  skill?: {
+    skill_name: string;
+  };
+}
+
 const ConnectionsPage = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("connections");
@@ -111,7 +125,8 @@ const ConnectionsPage = () => {
       // Format the accepted connections
       const acceptedConnections = (acceptedData || []).map(conn => {
         const isCurrentUserSender = conn.sender_id === user.id;
-        const profile = isCurrentUserSender ? conn.receiver : conn.sender;
+        // Use type assertion to handle the possible error types
+        const profile = isCurrentUserSender ? conn.receiver as UserData : conn.sender as UserData;
         
         return {
           id: profile.user_id,
@@ -126,22 +141,22 @@ const ConnectionsPage = () => {
       
       // Format the sent requests
       const formattedSent = (sentData || []).map(conn => ({
-        id: conn.receiver.user_id,
-        name: conn.receiver.full_name,
-        role: conn.receiver.role || "Professional",
-        location: conn.receiver.location || "Location not specified",
-        skills: conn.receiver.skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
+        id: (conn.receiver as UserData).user_id,
+        name: (conn.receiver as UserData).full_name,
+        role: (conn.receiver as UserData).role || "Professional",
+        location: (conn.receiver as UserData).location || "Location not specified",
+        skills: (conn.receiver as UserData).skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
         connectionId: conn.id,
         status: conn.status
       }));
       
       // Format the received requests
       const formattedReceived = (receivedData || []).map(conn => ({
-        id: conn.sender.user_id,
-        name: conn.sender.full_name,
-        role: conn.sender.role || "Professional",
-        location: conn.sender.location || "Location not specified",
-        skills: conn.sender.skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
+        id: (conn.sender as UserData).user_id,
+        name: (conn.sender as UserData).full_name,
+        role: (conn.sender as UserData).role || "Professional",
+        location: (conn.sender as UserData).location || "Location not specified",
+        skills: (conn.sender as UserData).skills?.map(s => s.skill?.skill_name).filter(Boolean) || [],
         connectionId: conn.id,
         status: conn.status
       }));

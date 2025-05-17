@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +16,11 @@ interface Connection {
   avatar?: string;
   lastMessage?: string;
   unreadCount: number;
+}
+
+interface UserData {
+  user_id: string;
+  full_name: string;
 }
 
 const MessagingPage = () => {
@@ -54,7 +58,9 @@ const MessagingPage = () => {
         
         for (const conn of connectionData || []) {
           // Determine the other user in the connection
-          const otherUser = conn.sender_id === user.id ? conn.receiver : conn.sender;
+          const isCurrentUserSender = conn.sender_id === user.id;
+          // Use type assertion to handle the possible error types
+          const otherUser = isCurrentUserSender ? conn.receiver as UserData : conn.sender as UserData;
           const otherId = otherUser.user_id;
           
           // Get unread message count

@@ -7,15 +7,25 @@ export const removeDummyUsers = async () => {
     console.log("Starting to remove dummy users...");
     
     // First get all users with example.com emails (our dummy users)
-    const { data: dummyUsers, error: fetchError } = await supabase.auth.admin
+    const { data: usersData, error: fetchError } = await supabase.auth.admin
       .listUsers();
     
     if (fetchError) {
       throw fetchError;
     }
     
-    const dummyUserIds = dummyUsers
-      .filter(user => user.email.includes('example.com'))
+    // Check if data exists and has users property
+    if (!usersData || !Array.isArray(usersData.users)) {
+      console.log("No users found or unexpected data structure");
+      return {
+        success: true,
+        removedCount: 0,
+        failedCount: 0
+      };
+    }
+    
+    const dummyUserIds = usersData.users
+      .filter(user => user.email && user.email.includes('example.com'))
       .map(user => user.id);
     
     console.log(`Found ${dummyUserIds.length} dummy users to remove`);
