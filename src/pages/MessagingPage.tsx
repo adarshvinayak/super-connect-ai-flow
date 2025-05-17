@@ -1,238 +1,242 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, SearchIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Search } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import MessageThread from "@/components/messaging/MessageThread";
 
-// Dummy data for conversations
-const dummyConversations = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    lastMessage: "Sounds great! Let's connect next week.",
-    timestamp: "10:30 AM",
-    unread: true,
-    avatar: "A"
-  },
-  {
-    id: "2",
-    name: "Taylor Smith",
-    lastMessage: "I'm interested in your proposal.",
-    timestamp: "Yesterday",
-    unread: false,
-    avatar: "T"
-  },
-  {
-    id: "3",
-    name: "Jamie Rivera",
-    lastMessage: "Can you share more details about your project?",
-    timestamp: "Monday",
-    unread: false,
-    avatar: "J"
-  },
-];
-
-// Dummy data for messages
-const dummyMessages = {
-  "1": [
-    { id: "1", sender: "user", text: "Hey Alex, I saw your profile and I'm interested in your AI project.", timestamp: "10:00 AM" },
-    { id: "2", sender: "other", text: "Hi there! Thanks for reaching out. Yes, I'm looking for a technical co-founder with backend experience.", timestamp: "10:15 AM" },
-    { id: "3", sender: "user", text: "That sounds perfect. I have 5+ years of backend development with Node.js and Python.", timestamp: "10:20 AM" },
-    { id: "4", sender: "other", text: "Sounds great! Let's connect next week.", timestamp: "10:30 AM" },
-  ],
-  "2": [
-    { id: "1", sender: "user", text: "Hello Taylor, I'm interested in discussing potential collaboration.", timestamp: "Yesterday" },
-    { id: "2", sender: "other", text: "I'm interested in your proposal.", timestamp: "Yesterday" },
-  ],
-  "3": [
-    { id: "1", sender: "other", text: "Can you share more details about your project?", timestamp: "Monday" },
-  ]
-};
+interface Connection {
+  id: string;
+  name: string;
+  avatar?: string;
+  lastMessage?: string;
+  unreadCount: number;
+}
 
 const MessagingPage = () => {
-  const { id } = useParams<{ id: string }>();
-  const [conversations, setConversations] = useState(dummyConversations);
-  const [selectedConversation, setSelectedConversation] = useState<string | undefined>(id);
-  const [newMessage, setNewMessage] = useState("");
-  const [messages, setMessages] = useState<any[]>([]);
+  const { id: selectedUserId } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   
-  // Set messages when conversation changes
   useEffect(() => {
-    if (selectedConversation && dummyMessages[selectedConversation as keyof typeof dummyMessages]) {
-      setMessages(dummyMessages[selectedConversation as keyof typeof dummyMessages]);
-      
-      // Mark as read
-      setConversations(prevConversations => 
-        prevConversations.map(conv => 
-          conv.id === selectedConversation ? { ...conv, unread: false } : conv
-        )
-      );
-    } else {
-      setMessages([]);
-    }
-  }, [selectedConversation]);
-  
-  // Filter conversations based on search
-  const filteredConversations = conversations.filter(conv => 
-    conv.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
+    if (!user) return;
     
-    if (!newMessage.trim() || !selectedConversation) return;
-    
-    const newMsg = {
-      id: `new-${Date.now()}`,
-      sender: "user",
-      text: newMessage,
-      timestamp: "Just now"
+    const loadConnections = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get all accepted connections
+        const { data: connectionData, error: connectionError } = await supabase
+          .from('connection_requests')
+          .select(`
+            id,
+            status,
+            sender_id,
+            sender:sender_id(user_id, full_name),
+            receiver_id,
+            receiver:receiver_id(user_id, full_name)
+          `)
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+        
+        if (connectionError) throw connectionError;
+        
+        const connectionsList: Connection[] = [];
+        
+        for (const conn of connectionData || []) {
+          // Determine the other user in the connection
+          const otherUser = conn.sender_id === user.id ? conn.receiver : conn.sender;
+          const otherId = otherUser.user_id;
+          
+          // Get unread message count
+          const { count, error: countError } = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: false })
+            .eq('sender_id', otherId)
+            .eq('receiver_id', user.id)
+            .eq('is_read', false);
+          
+          if (countError) throw countError;
+          
+          // Get last message
+          const { data: lastMessageData } = await supabase
+            .from('messages')
+            .select('content')
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`)
+            .order('timestamp', { ascending: false })
+            .limit(1);
+          
+          connectionsList.push({
+            id: otherId,
+            name: otherUser.full_name,
+            lastMessage: lastMessageData && lastMessageData[0]?.content,
+            unreadCount: count || 0
+          });
+        }
+        
+        setConnections(connectionsList);
+        
+        // If there's a selectedUserId from URL params, set it as selected
+        if (selectedUserId) {
+          const selected = connectionsList.find(conn => conn.id === selectedUserId);
+          if (selected) {
+            setSelectedConnection(selected);
+          } else {
+            // If the selected user is not in connections, fetch their info
+            const { data: userData } = await supabase
+              .from('users')
+              .select('user_id, full_name')
+              .eq('user_id', selectedUserId)
+              .single();
+              
+            if (userData) {
+              const newConnection = {
+                id: userData.user_id,
+                name: userData.full_name,
+                unreadCount: 0
+              };
+              setConnections([...connectionsList, newConnection]);
+              setSelectedConnection(newConnection);
+            }
+          }
+        } else if (connectionsList.length > 0) {
+          // If no selected user and we have connections, select the first one
+          setSelectedConnection(connectionsList[0]);
+        }
+      } catch (error) {
+        console.error("Error loading connections:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     
-    setMessages(prev => [...prev, newMsg]);
-    setNewMessage("");
+    loadConnections();
     
-    // Update the conversation list
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.id === selectedConversation 
-          ? { ...conv, lastMessage: newMessage, timestamp: "Just now" }
-          : conv
+    // Set up real-time subscription for new messages
+    const channel = supabase
+      .channel('realtime:messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`
+        },
+        () => {
+          // Reload connections when a new message arrives
+          loadConnections();
+        }
       )
-    );
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedUserId]);
+  
+  const filteredConnections = connections.filter(conn => 
+    conn.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase();
   };
   
-  // Get the selected conversation data
-  const activeConversation = conversations.find(conv => conv.id === selectedConversation);
-  
   return (
-    <div className="h-[calc(100vh-9rem)] flex overflow-hidden bg-white rounded-lg shadow">
-      {/* Sidebar with conversations */}
-      <div className="w-full max-w-xs border-r">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg mb-2">Messages</h2>
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <Input 
-              placeholder="Search conversations" 
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <div className="space-y-6 h-[calc(100vh-12rem)]">
+      <h1 className="text-2xl font-bold">Messages</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+        {/* Connections list */}
+        <div className="border rounded-lg overflow-hidden md:col-span-1">
+          <div className="p-4 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Input
+                placeholder="Search conversations..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="h-[calc(100%-69px)] overflow-y-auto">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-32">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : filteredConnections.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No conversations yet
+              </div>
+            ) : (
+              <div>
+                {filteredConnections.map((connection) => (
+                  <Button
+                    key={connection.id}
+                    variant="ghost"
+                    className={`w-full justify-start px-4 py-3 h-auto ${
+                      selectedConnection?.id === connection.id ? 'bg-gray-100' : ''
+                    }`}
+                    onClick={() => setSelectedConnection(connection)}
+                  >
+                    <div className="flex items-center space-x-3 w-full">
+                      <Avatar>
+                        <AvatarImage src={connection.avatar} />
+                        <AvatarFallback>{getInitials(connection.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-grow text-left">
+                        <div className="flex justify-between">
+                          <span className="font-medium">{connection.name}</span>
+                          {connection.unreadCount > 0 && (
+                            <span className="h-5 w-5 bg-primary text-xs rounded-full flex items-center justify-center text-primary-foreground">
+                              {connection.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        {connection.lastMessage && (
+                          <p className="text-sm text-gray-500 truncate">
+                            {connection.lastMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         
-        <ScrollArea className="h-[calc(100vh-13rem)]">
-          {filteredConversations.length > 0 ? (
-            filteredConversations.map(conv => (
-              <div
-                key={conv.id}
-                onClick={() => setSelectedConversation(conv.id)}
-                className={cn(
-                  "p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors",
-                  selectedConversation === conv.id ? "bg-gray-100" : "",
-                  conv.unread ? "bg-blue-50" : ""
-                )}
-              >
-                <div className="flex items-center">
-                  <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
-                    {conv.avatar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline">
-                      <h3 className="font-medium truncate">{conv.name}</h3>
-                      <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
-                        {conv.timestamp}
-                      </span>
-                    </div>
-                    <p className={cn(
-                      "text-sm truncate",
-                      conv.unread ? "font-medium text-gray-900" : "text-gray-500"
-                    )}>
-                      {conv.lastMessage}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))
+        {/* Messages area */}
+        <div className="border rounded-lg overflow-hidden md:col-span-2 h-full">
+          {selectedConnection ? (
+            <MessageThread
+              recipientId={selectedConnection.id}
+              recipientName={selectedConnection.name}
+              recipientAvatar={selectedConnection.avatar}
+            />
           ) : (
-            <div className="p-4 text-center text-gray-500">
-              No conversations found
+            <div className="flex items-center justify-center h-full text-gray-400">
+              <p>Select a conversation to start messaging</p>
             </div>
           )}
-        </ScrollArea>
-      </div>
-      
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col">
-        {selectedConversation && activeConversation ? (
-          <>
-            {/* Chat header */}
-            <div className="p-4 border-b flex items-center">
-              <div className="h-10 w-10 rounded-full gradient-bg flex items-center justify-center text-white font-medium mr-3">
-                {activeConversation.avatar}
-              </div>
-              <div>
-                <h3 className="font-medium">{activeConversation.name}</h3>
-              </div>
-            </div>
-            
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "max-w-md rounded-lg p-3",
-                      message.sender === "user"
-                        ? "ml-auto bg-supernet-purple text-white"
-                        : "bg-gray-100 text-gray-800"
-                    )}
-                  >
-                    <p>{message.text}</p>
-                    <p className={cn(
-                      "text-xs mt-1",
-                      message.sender === "user"
-                        ? "text-white/70"
-                        : "text-gray-500"
-                    )}>
-                      {message.timestamp}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            
-            {/* Message input */}
-            <div className="p-4 border-t">
-              <form onSubmit={handleSendMessage} className="flex items-center">
-                <Input
-                  placeholder="Type your message..."
-                  className="flex-1 mr-2"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                />
-                <Button type="submit" size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center p-4">
-            <div className="text-center">
-              <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
-              <p className="text-gray-500">
-                Choose a conversation from the sidebar or start a new one
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

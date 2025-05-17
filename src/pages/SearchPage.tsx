@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Map, ChevronDown, Loader2 } from "lucide-react";
+import { Search, Filter, Map, ChevronDown, Loader2, Send } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase, getSession } from "@/integrations/supabase/client";
@@ -12,7 +13,11 @@ import { toast } from "sonner";
 
 const SearchPage = () => {
   const { user } = useAuth();
-  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQuery = searchParams.get("q") || "";
+  
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -22,8 +27,39 @@ const SearchPage = () => {
     sortBy: "relevance"
   });
   
+  const [pendingConnections, setPendingConnections] = useState([]);
+  
+  // Fetch pending connection requests
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchPendingConnections = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('connection_requests')
+          .select('receiver_id')
+          .eq('sender_id', user.id)
+          .eq('status', 'pending');
+        
+        if (error) throw error;
+        setPendingConnections(data?.map(conn => conn.receiver_id) || []);
+      } catch (err) {
+        console.error("Error fetching pending connections:", err);
+      }
+    };
+    
+    fetchPendingConnections();
+  }, [user]);
+  
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Update URL with search query
+    if (query.trim()) {
+      setSearchParams({ q: query.trim() });
+    } else {
+      setSearchParams({});
+    }
     
     if (!query.trim()) {
       // If query is empty, load all users
@@ -60,10 +96,10 @@ const SearchPage = () => {
         // Process the results to match our UI format
         const formattedResults = data.results.map(user => {
           // Extract skills from the nested structure
-          const skills = user.skills?.map(skillObj => skillObj.skill.skill_name) || [];
+          const skills = user.skills?.map(skillObj => skillObj.skill?.skill_name).filter(Boolean) || [];
           
           // Extract intents if available
-          const intents = user.intents?.map(intentObj => intentObj.intent.intent_name) || [];
+          const intents = user.intents?.map(intentObj => intentObj.intent?.intent_name).filter(Boolean) || [];
           
           return {
             id: user.user_id,
@@ -72,7 +108,8 @@ const SearchPage = () => {
             location: user.location || "Location not specified",
             skills: skills,
             bio: user.bio || "No bio available",
-            networkingIntent: intents[0] || "not specified"
+            networkingIntent: intents[0] || "not specified",
+            matchExplanation: user.match_explanation || null
           };
         });
         
@@ -103,6 +140,7 @@ const SearchPage = () => {
           full_name,
           bio,
           location,
+          role,
           skills:user_skills(skill:skills(skill_name))
         `)
         .neq('user_id', user?.id); // Exclude current user
@@ -112,12 +150,12 @@ const SearchPage = () => {
       // Format the users to match our UI
       const formattedUsers = users.map(user => {
         // Extract skills from the nested structure
-        const skills = user.skills?.map(skillObj => skillObj.skill.skill_name) || [];
+        const skills = user.skills?.map(skillObj => skillObj.skill?.skill_name).filter(Boolean) || [];
         
         return {
           id: user.user_id,
           name: user.full_name,
-          role: "Professional", // Default role since it doesn't exist in the database
+          role: user.role || "Professional",
           location: user.location || "Location not specified",
           skills: skills,
           bio: user.bio || "No bio available",
@@ -143,7 +181,7 @@ const SearchPage = () => {
     }
   };
   
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
@@ -167,11 +205,54 @@ const SearchPage = () => {
     
     setResults(filtered);
   };
+  
+  const sendConnectionRequest = async (receiverId) => {
+    if (!user) {
+      toast.error("You must be logged in to send connection requests");
+      navigate("/auth");
+      return;
+    }
+    
+    try {
+      // Insert the connection request
+      const { data, error } = await supabase
+        .from('connection_requests')
+        .insert({
+          sender_id: user.id,
+          receiver_id: receiverId,
+          status: 'pending'
+        });
+      
+      if (error) throw error;
+      
+      // Add to pending connections list
+      setPendingConnections([...pendingConnections, receiverId]);
+      
+      // Create notification by adding to user_activity
+      await supabase
+        .from('user_activity')
+        .insert({
+          user_id: receiverId,
+          activity_type: 'connection_request',
+          description: `New connection request from ${user.email}`,
+          entity_id: user.id
+        });
+      
+      toast.success("Connection request sent!");
+    } catch (error) {
+      console.error("Error sending connection request:", error);
+      toast.error("Failed to send connection request: " + error.message);
+    }
+  };
 
-  // Initialize search
+  // Initialize search when component loads or URL changes
   useEffect(() => {
-    fetchAllUsers();
-  }, [user]);
+    if (initialQuery) {
+      handleSearch(new Event('submit') as any);
+    } else {
+      fetchAllUsers();
+    }
+  }, [initialQuery]);
   
   return (
     <div className="space-y-6">
@@ -325,7 +406,13 @@ const SearchPage = () => {
                   {user.location}
                 </div>
                 
-                <p className="text-gray-700 mb-4 line-clamp-2">{user.bio}</p>
+                <p className="text-gray-700 mb-3 line-clamp-2">{user.bio}</p>
+                
+                {user.matchExplanation && (
+                  <div className="mb-4 p-2 bg-blue-50 text-blue-700 text-sm rounded-md border border-blue-100">
+                    <p className="italic">{user.matchExplanation}</p>
+                  </div>
+                )}
                 
                 <div className="flex flex-wrap gap-1">
                   {user.skills.map((skill) => (
@@ -333,13 +420,24 @@ const SearchPage = () => {
                   ))}
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button variant="outline" size="sm" className="mr-2" asChild>
+              <CardFooter className="flex justify-between">
+                <Button variant="outline" size="sm" asChild>
                   <Link to={`/profile/${user.id}`}>View Profile</Link>
                 </Button>
-                <Button size="sm" asChild>
-                  <Link to={`/messaging/${user.id}`}>Connect</Link>
-                </Button>
+                
+                {pendingConnections.includes(user.id) ? (
+                  <Button size="sm" variant="outline" disabled>
+                    Request Sent
+                  </Button>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    onClick={() => sendConnectionRequest(user.id)}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Connect
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))
