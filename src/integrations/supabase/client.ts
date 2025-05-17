@@ -5,18 +5,7 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://dvdkihicwovcfbwlfmrk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2ZGtpaGljd292Y2Zid2xmbXJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0NzEwODYsImV4cCI6MjA2MzA0NzA4Nn0.ROGAjrT1ddd9j5XTEwhLROwy0R-FM7uoHItfsdyZciY";
 
-// Create Supabase client with auth configuration
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+// Import the supabase client like this:
+// import { supabase } from "@/integrations/supabase/client";
 
-// Legacy function to keep compatibility with older code
-// This helps with the session() error in SearchPage.tsx
-export const getSession = async () => {
-  const { data } = await supabase.auth.getSession();
-  return data.session;
-};
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);

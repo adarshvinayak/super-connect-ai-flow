@@ -1,25 +1,74 @@
 
-import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Map, ChevronDown, Loader2, Send } from "lucide-react";
+import { Search, Filter, Map, ChevronDown } from "lucide-react";
 import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from "@/components/ui/select";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase, getSession } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+
+// Dummy data for demo purposes
+const dummyUsers = [
+  {
+    id: "1",
+    name: "Alex Johnson",
+    role: "Frontend Developer",
+    location: "San Francisco, CA",
+    skills: ["React", "TypeScript", "UI/UX"],
+    bio: "Frontend developer specializing in React and TypeScript. Looking for co-founding opportunities in the AI space.",
+    networkingIntent: "cofounder"
+  },
+  {
+    id: "2",
+    name: "Taylor Smith",
+    role: "Product Manager",
+    location: "New York, NY",
+    skills: ["Product Strategy", "User Research", "Agile"],
+    bio: "Experienced product manager with a track record of launching successful SaaS products. Looking for technical co-founders.",
+    networkingIntent: "cofounder"
+  },
+  {
+    id: "3",
+    name: "Jamie Rivera",
+    role: "Marketing Specialist",
+    location: "Austin, TX",
+    skills: ["Content Strategy", "SEO", "Social Media"],
+    bio: "Growth marketer with a passion for helping startups scale. Seeking partners with technical skills.",
+    networkingIntent: "client"
+  },
+  {
+    id: "4",
+    name: "Morgan Lee",
+    role: "UX Designer",
+    location: "Seattle, WA",
+    skills: ["UI Design", "User Research", "Figma"],
+    bio: "UX designer focused on creating beautiful, intuitive interfaces. Looking to collaborate with developers on client projects.",
+    networkingIntent: "client"
+  },
+  {
+    id: "5",
+    name: "Casey Wong",
+    role: "Project Manager",
+    location: "Chicago, IL",
+    skills: ["Agile", "Scrum", "Team Leadership"],
+    bio: "Experienced project manager seeking talented developers to join our team for ongoing client work.",
+    networkingIntent: "teammate"
+  },
+  {
+    id: "6",
+    name: "Jordan Taylor",
+    role: "CTO",
+    location: "Boston, MA",
+    skills: ["System Architecture", "Team Building", "Strategic Planning"],
+    bio: "CTO of a growing startup looking to expand our engineering team with talented developers.",
+    networkingIntent: "teammate"
+  },
+];
 
 const SearchPage = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialQuery = searchParams.get("q") || "";
-  
-  const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState(dummyUsers);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     intent: "all",
@@ -27,166 +76,29 @@ const SearchPage = () => {
     sortBy: "relevance"
   });
   
-  const [pendingConnections, setPendingConnections] = useState([]);
-  
-  // Fetch pending connection requests
-  useEffect(() => {
-    if (!user) return;
-    
-    const fetchPendingConnections = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('connection_requests')
-          .select('receiver_id')
-          .eq('sender_id', user.id)
-          .eq('status', 'pending');
-        
-        if (error) throw error;
-        setPendingConnections(data?.map(conn => conn.receiver_id) || []);
-      } catch (err) {
-        console.error("Error fetching pending connections:", err);
-      }
-    };
-    
-    fetchPendingConnections();
-  }, [user]);
-  
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Update URL with search query
-    if (query.trim()) {
-      setSearchParams({ q: query.trim() });
-    } else {
-      setSearchParams({});
-    }
-    
     if (!query.trim()) {
-      // If query is empty, load all users
-      fetchAllUsers();
+      setResults(dummyUsers);
       return;
     }
     
-    setIsSearching(true);
+    // Simple search implementation for the demo
+    const filtered = dummyUsers.filter(user => {
+      const searchString = `${user.name} ${user.role} ${user.location} ${user.bio} ${user.skills.join(" ")}`.toLowerCase();
+      return searchString.includes(query.toLowerCase());
+    });
     
-    try {
-      // Get current session for authorization
-      const session = await getSession();
-      
-      // Call the AI search edge function
-      const response = await fetch(`https://dvdkihicwovcfbwlfmrk.supabase.co/functions/v1/ai-search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({
-          query: query
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to search");
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.results) {
-        // Process the results to match our UI format
-        const formattedResults = data.results.map(user => {
-          // Extract skills from the nested structure
-          const skills = user.skills?.map(skillObj => skillObj.skill?.skill_name).filter(Boolean) || [];
-          
-          // Extract intents if available
-          const intents = user.intents?.map(intentObj => intentObj.intent?.intent_name).filter(Boolean) || [];
-          
-          return {
-            id: user.user_id,
-            name: user.full_name,
-            role: user.role || "Professional",
-            location: user.location || "Location not specified",
-            skills: skills,
-            bio: user.bio || "No bio available",
-            networkingIntent: intents[0] || "not specified",
-            matchExplanation: user.match_explanation || null
-          };
-        });
-        
-        setResults(formattedResults);
-      } else {
-        // If there's an issue with the search, fall back to basic filtering
-        console.log("AI search returned no results, falling back to basic search");
-        await fetchAllUsers();
-      }
-    } catch (error) {
-      console.error("Search error:", error);
-      toast.error("Search error: " + (error.message || "Failed to perform search"));
-      
-      // Fall back to basic search
-      await fetchAllUsers();
-    } finally {
-      setIsSearching(false);
-    }
+    setResults(filtered);
   };
   
-  const fetchAllUsers = async () => {
-    try {
-      // Basic user search in the database
-      const { data: users, error } = await supabase
-        .from('users')
-        .select(`
-          user_id,
-          full_name,
-          bio,
-          location,
-          role,
-          skills:user_skills(skill:skills(skill_name))
-        `)
-        .neq('user_id', user?.id); // Exclude current user
-      
-      if (error) throw error;
-      
-      // Format the users to match our UI
-      const formattedUsers = users.map(user => {
-        // Extract skills from the nested structure
-        const skills = user.skills?.map(skillObj => skillObj.skill?.skill_name).filter(Boolean) || [];
-        
-        return {
-          id: user.user_id,
-          name: user.full_name,
-          role: user.role || "Professional",
-          location: user.location || "Location not specified",
-          skills: skills,
-          bio: user.bio || "No bio available",
-          networkingIntent: "not specified"
-        };
-      });
-      
-      // Apply text search if query exists
-      if (query.trim()) {
-        const lowerQuery = query.toLowerCase();
-        const filtered = formattedUsers.filter(user => {
-          const searchString = `${user.name} ${user.role} ${user.location} ${user.bio} ${user.skills.join(" ")}`.toLowerCase();
-          return searchString.includes(lowerQuery);
-        });
-        setResults(filtered);
-      } else {
-        setResults(formattedUsers);
-      }
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to load users");
-      setResults([]);
-    }
-  };
-  
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = (key: string, value: string) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Apply filters to current results
-    let filtered = [...results];
+    // Apply filters
+    let filtered = [...dummyUsers];
     
     // Filter by intent
     if (newFilters.intent !== "all") {
@@ -198,61 +110,22 @@ const SearchPage = () => {
       filtered = filtered.filter(user => user.location.includes(newFilters.location));
     }
     
+    // Apply search query if exists
+    if (query.trim()) {
+      filtered = filtered.filter(user => {
+        const searchString = `${user.name} ${user.role} ${user.location} ${user.bio} ${user.skills.join(" ")}`.toLowerCase();
+        return searchString.includes(query.toLowerCase());
+      });
+    }
+    
     // Sort results
     if (newFilters.sortBy === "name") {
       filtered.sort((a, b) => a.name.localeCompare(b.name));
     }
+    // Add other sorting options as needed
     
     setResults(filtered);
   };
-  
-  const sendConnectionRequest = async (receiverId) => {
-    if (!user) {
-      toast.error("You must be logged in to send connection requests");
-      navigate("/auth");
-      return;
-    }
-    
-    try {
-      // Insert the connection request
-      const { data, error } = await supabase
-        .from('connection_requests')
-        .insert({
-          sender_id: user.id,
-          receiver_id: receiverId,
-          status: 'pending'
-        });
-      
-      if (error) throw error;
-      
-      // Add to pending connections list
-      setPendingConnections([...pendingConnections, receiverId]);
-      
-      // Create notification by adding to user_activity
-      await supabase
-        .from('user_activity')
-        .insert({
-          user_id: receiverId,
-          activity_type: 'connection_request',
-          description: `New connection request from ${user.email}`,
-          entity_id: user.id
-        });
-      
-      toast.success("Connection request sent!");
-    } catch (error) {
-      console.error("Error sending connection request:", error);
-      toast.error("Failed to send connection request: " + error.message);
-    }
-  };
-
-  // Initialize search when component loads or URL changes
-  useEffect(() => {
-    if (initialQuery) {
-      handleSearch(new Event('submit') as any);
-    } else {
-      fetchAllUsers();
-    }
-  }, [initialQuery]);
   
   return (
     <div className="space-y-6">
@@ -271,15 +144,8 @@ const SearchPage = () => {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <Button type="submit" className="rounded-l-none" disabled={isSearching}>
-              {isSearching ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                "Search"
-              )}
+            <Button type="submit" className="rounded-l-none">
+              Search
             </Button>
           </div>
         </form>
@@ -370,7 +236,7 @@ const SearchPage = () => {
                 size="sm"
                 onClick={() => {
                   setFilters({ intent: "all", location: "all", sortBy: "relevance" });
-                  fetchAllUsers();
+                  setResults(dummyUsers);
                 }}
               >
                 Reset Filters
@@ -382,14 +248,7 @@ const SearchPage = () => {
       
       {/* Search Results */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {isSearching ? (
-          <div className="col-span-full flex justify-center py-12">
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-              <p className="text-gray-600">Searching for matches...</p>
-            </div>
-          </div>
-        ) : results.length > 0 ? (
+        {results.length > 0 ? (
           results.map((user) => (
             <Card key={user.id} className="card-hover">
               <CardHeader className="pb-2">
@@ -406,13 +265,7 @@ const SearchPage = () => {
                   {user.location}
                 </div>
                 
-                <p className="text-gray-700 mb-3 line-clamp-2">{user.bio}</p>
-                
-                {user.matchExplanation && (
-                  <div className="mb-4 p-2 bg-blue-50 text-blue-700 text-sm rounded-md border border-blue-100">
-                    <p className="italic">{user.matchExplanation}</p>
-                  </div>
-                )}
+                <p className="text-gray-700 mb-4 line-clamp-2">{user.bio}</p>
                 
                 <div className="flex flex-wrap gap-1">
                   {user.skills.map((skill) => (
@@ -420,24 +273,13 @@ const SearchPage = () => {
                   ))}
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" size="sm" asChild>
+              <CardFooter>
+                <Button variant="outline" size="sm" className="mr-2" asChild>
                   <Link to={`/profile/${user.id}`}>View Profile</Link>
                 </Button>
-                
-                {pendingConnections.includes(user.id) ? (
-                  <Button size="sm" variant="outline" disabled>
-                    Request Sent
-                  </Button>
-                ) : (
-                  <Button 
-                    size="sm" 
-                    onClick={() => sendConnectionRequest(user.id)}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Connect
-                  </Button>
-                )}
+                <Button size="sm" asChild>
+                  <Link to={`/messaging/${user.id}`}>Connect</Link>
+                </Button>
               </CardFooter>
             </Card>
           ))

@@ -18,9 +18,7 @@ const corsHeaders = {
 };
 
 // Create a Groq API client function
-async function queryGroq(prompt: string, model: string = "llama-3-3-70b-versatile") {
-  console.log(`Querying GROQ with model: ${model}`);
-  
+async function queryGroq(prompt: string, model: string = "llama-3.1-8b-instant") {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -32,7 +30,7 @@ async function queryGroq(prompt: string, model: string = "llama-3-3-70b-versatil
       messages: [
         {
           role: "system",
-          content: "You are an assistant that helps parse natural language search queries into structured search parameters for a professional networking platform. You extract skills, location preferences, intent, availability, and working style."
+          content: "You are an assistant that helps parse natural language search queries into structured search parameters."
         },
         {
           role: "user",
@@ -95,14 +93,11 @@ serve(async (req) => {
       - intent: The purpose of the search (e.g., finding a co-founder, client, teammate, etc.)
       - availability: Any mentioned availability preferences (e.g., full-time, part-time, etc.)
       - working_style: Any mentioned working style preferences (e.g., remote, in-office, etc.)
-      - years_experience: Any mentioned years of experience
       
       ONLY return a valid JSON object with these fields, nothing else.
       If a field is not mentioned in the search query, set its value to null.
     `;
 
-    console.log("Sending search query to Groq API");
-    
     // Send the request to Groq API
     const groqResponse = await queryGroq(prompt);
     let searchParams;
@@ -117,7 +112,6 @@ serve(async (req) => {
                         [null, responseText];
       
       searchParams = JSON.parse(jsonMatch[1] || responseText);
-      console.log("Parsed search parameters:", JSON.stringify(searchParams));
     } catch (error) {
       console.error("Error parsing Groq response:", error);
       searchParams = { 
@@ -133,7 +127,6 @@ serve(async (req) => {
         user_id,
         full_name,
         location,
-        role,
         bio,
         skills:user_skills(skill:skills(skill_name)),
         intents:user_intents(intent:intents(intent_name))
@@ -141,74 +134,29 @@ serve(async (req) => {
     
     // Apply filters based on the parsed parameters
     if (searchParams.skills && searchParams.skills.length > 0) {
-      // Get user IDs with matching skills
-      const { data: userSkills } = await supabase
-        .from('user_skills')
-        .select('user_id, skill_id')
-        .in('skill_id', function() {
-          this.select('skill_id')
-            .from('skills')
-            .textSearch('skill_name', searchParams.skills.join(' | '));
-        });
-      
-      if (userSkills && userSkills.length > 0) {
-        const userIds = [...new Set(userSkills.map(us => us.user_id))];
-        query = query.in('user_id', userIds);
-      }
+      // Complex query for skills since they're in a related table
+      // This is a simplified approach
+      const skillNames = searchParams.skills.map(skill => skill.toLowerCase());
+      query = query.in('skills.skill.skill_name', skillNames);
     }
 
     if (searchParams.location) {
       query = query.ilike('location', `%${searchParams.location}%`);
     }
 
-    // Executive the query
+    // Execute the query
     const { data: results, error } = await query;
 
     if (error) {
       throw new Error(`Database query error: ${error.message}`);
     }
 
-    // Generate match explanations
-    const resultsWithExplanations = await Promise.all((results || []).map(async (user) => {
-      try {
-        // Create a prompt for match explanation
-        const matchExplanationPrompt = `
-          Analyze why this user might be a good match for the search query: "${query}"
-          
-          User profile:
-          Name: ${user.full_name}
-          Role: ${user.role || 'Not specified'}
-          Location: ${user.location || 'Not specified'}
-          Bio: ${user.bio || 'No bio provided'}
-          Skills: ${user.skills?.map(s => s.skill?.skill_name).join(', ') || 'None specified'}
-          
-          Provide a 2-3 line explanation focusing on why this person might be relevant to the query.
-          Be concise and professional. Highlight specific matching aspects.
-        `;
-        
-        // Get explanation from Groq
-        const explanationResponse = await queryGroq(matchExplanationPrompt);
-        const explanation = explanationResponse.choices[0].message.content.trim();
-        
-        return {
-          ...user,
-          match_explanation: explanation
-        };
-      } catch (error) {
-        console.error(`Error generating match explanation for user ${user.user_id}:`, error);
-        return {
-          ...user,
-          match_explanation: "No match explanation available"
-        };
-      }
-    }));
-
-    // Return the search results with explanations
+    // Return the search results
     return new Response(
       JSON.stringify({ 
         success: true,
         search_parameters: searchParams,
-        results: resultsWithExplanations || []
+        results: results || []
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" }

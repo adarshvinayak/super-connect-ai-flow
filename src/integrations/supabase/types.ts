@@ -9,60 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      chat_messages: {
-        Row: {
-          content: string
-          created_at: string
-          id: string
-          read: boolean
-          receiver_id: string
-          sender_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          id?: string
-          read?: boolean
-          receiver_id: string
-          sender_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: string
-          read?: boolean
-          receiver_id?: string
-          sender_id?: string
-        }
-        Relationships: []
-      }
-      connection_requests: {
-        Row: {
-          created_at: string
-          id: string
-          receiver_id: string
-          sender_id: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          receiver_id: string
-          sender_id: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          receiver_id?: string
-          sender_id?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       ikigai_responses: {
         Row: {
           created_at: string
@@ -302,33 +248,6 @@ export type Database = {
           },
         ]
       }
-      user_activity: {
-        Row: {
-          activity_type: string
-          created_at: string
-          description: string
-          entity_id: string | null
-          id: string
-          user_id: string
-        }
-        Insert: {
-          activity_type: string
-          created_at?: string
-          description: string
-          entity_id?: string | null
-          id?: string
-          user_id: string
-        }
-        Update: {
-          activity_type?: string
-          created_at?: string
-          description?: string
-          entity_id?: string | null
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_consent: {
         Row: {
           consent_given: boolean
@@ -364,78 +283,6 @@ export type Database = {
           },
         ]
       }
-      user_education: {
-        Row: {
-          created_at: string
-          degree: string | null
-          description: string | null
-          end_date: string | null
-          field_of_study: string | null
-          id: string
-          institution: string
-          start_date: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          degree?: string | null
-          description?: string | null
-          end_date?: string | null
-          field_of_study?: string | null
-          id?: string
-          institution: string
-          start_date?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          degree?: string | null
-          description?: string | null
-          end_date?: string | null
-          field_of_study?: string | null
-          id?: string
-          institution?: string
-          start_date?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_employment: {
-        Row: {
-          company: string
-          created_at: string
-          current: boolean | null
-          description: string | null
-          end_date: string | null
-          id: string
-          position: string
-          start_date: string | null
-          user_id: string
-        }
-        Insert: {
-          company: string
-          created_at?: string
-          current?: boolean | null
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          position: string
-          start_date?: string | null
-          user_id: string
-        }
-        Update: {
-          company?: string
-          created_at?: string
-          current?: boolean | null
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          position?: string
-          start_date?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_intents: {
         Row: {
           details: string | null
@@ -468,36 +315,6 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
-      }
-      user_projects: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          image_url: string | null
-          title: string
-          url: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          title: string
-          url?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          title?: string
-          url?: string | null
-          user_id?: string
-        }
-        Relationships: []
       }
       user_skills: {
         Row: {
@@ -537,7 +354,6 @@ export type Database = {
           full_name: string
           last_login: string | null
           location: string | null
-          role: string | null
           updated_at: string
           user_id: string
         }
@@ -548,7 +364,6 @@ export type Database = {
           full_name: string
           last_login?: string | null
           location?: string | null
-          role?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -559,7 +374,6 @@ export type Database = {
           full_name?: string
           last_login?: string | null
           location?: string | null
-          role?: string | null
           updated_at?: string
           user_id?: string
         }

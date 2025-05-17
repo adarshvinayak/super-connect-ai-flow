@@ -38,12 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, currentSession) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        
-        if (event === 'SIGNED_IN') {
-          toast.success("Signed in successfully");
-        } else if (event === 'SIGNED_OUT') {
-          toast.success("Signed out successfully");
-        }
       }
     );
 
@@ -58,75 +52,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) {
-        console.error("Sign in error:", error.message);
-        toast.error(error.message || "Failed to sign in");
-        throw error;
-      }
-      
-      setUser(data.user);
-      setSession(data.session);
-      return;
-    } catch (err) {
-      console.error("Sign in error:", err);
-      toast.error("Failed to sign in. Please check your credentials.");
-      throw err;
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    if (error) {
+      throw error;
     }
+    
+    setUser(data.user);
+    setSession(data.session);
+    return;
   };
   
   const signUp = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password
-      });
-      
-      if (error) {
-        console.error("Sign up error:", error.message);
-        toast.error(error.message || "Failed to sign up");
-        throw error;
-      }
-      
-      setUser(data.user);
-      setSession(data.session);
-      
-      if (data.user && !data.session) {
-        // User needs to confirm email
-        toast.info("Please check your email to confirm your account");
-      }
-      
-      return;
-    } catch (err) {
-      console.error("Sign up error:", err);
-      toast.error("Failed to create account. Please try again.");
-      throw err;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
+    });
+    
+    if (error) {
+      throw error;
     }
+    
+    setUser(data.user);
+    setSession(data.session);
+    return;
   };
   
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("Sign out error:", error.message);
-        toast.error(error.message || "Failed to sign out");
-        throw error;
-      }
-      
-      setUser(null);
-      setSession(null);
-      return;
-    } catch (err) {
-      console.error("Sign out error:", err);
-      toast.error("Failed to sign out. Please try again.");
-      throw err;
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      throw error;
     }
+    
+    setUser(null);
+    setSession(null);
+    return;
   };
   
   return (

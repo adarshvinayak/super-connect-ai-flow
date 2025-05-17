@@ -1,308 +1,42 @@
-import { useState, useEffect } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Edit, Download, ChevronRight } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useNavigate } from "react-router-dom";
 
-interface UserProfile {
-  id: string;
-  name: string;
-  role?: string; // Make role optional
-  location?: string;
-  bio?: string;
-  skills: string[];
-  email: string;
-  profileVisibility: string;
-  networkingIntent: string;
-  workingStyle: string;
-  availability: string;
-  portfolioUrl: string;
-  linkedinUrl: string;
-  githubUrl: string;
-  connections: number;
-  profileViews: number;
-  blockedUsers: any[];
-}
+// Placeholder user data
+const userData = {
+  id: "current-user",
+  name: "Sam Taylor",
+  role: "Full Stack Developer",
+  location: "Seattle, WA",
+  bio: "Passionate developer with 5+ years of experience building web applications. Looking to connect with potential co-founders for my next venture in AI-powered tools.",
+  skills: ["React", "Node.js", "TypeScript", "Python", "AI/ML"],
+  email: "sam@example.com",
+  profileVisibility: "public",
+  networkingIntent: "cofounder",
+  workingStyle: "remote",
+  availability: "full-time",
+  portfolioUrl: "https://samtaylor.dev",
+  linkedinUrl: "https://linkedin.com/in/samtaylor",
+  githubUrl: "https://github.com/samtaylor",
+  connections: 7,
+  profileViews: 24,
+  blockedUsers: [],
+};
 
 const ProfilePage = () => {
-  const { user } = useAuth();
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const navigate = useNavigate();
-  const [userData, setUserData] = useState<UserProfile>({
-    id: "",
-    name: "",
-    role: "",
-    location: "",
-    bio: "",
-    skills: [],
-    email: "",
-    profileVisibility: "public",
-    networkingIntent: "cofounder",
-    workingStyle: "remote",
-    availability: "full-time",
-    portfolioUrl: "",
-    linkedinUrl: "",
-    githubUrl: "",
-    connections: 0,
-    profileViews: 0,
-    blockedUsers: [],
-  });
-  
-  const [formData, setFormData] = useState({
-    full_name: "",
-    role: "",
-    location: "",
-    bio: "",
-    profileVisibility: "public",
-    networkingIntent: "cofounder",
-    workingStyle: "remote",
-    availability: "full-time",
-    portfolioUrl: "",
-    linkedinUrl: "",
-    githubUrl: "",
-  });
-
-  // Fetch user data on component mount
-  useEffect(() => {
-    if (user) {
-      fetchUserData();
-    }
-  }, [user]);
-
-  const fetchUserData = async () => {
-    try {
-      // Fetch user profile data
-      const { data: userProfile, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (userError) throw userError;
-
-      // Fetch skills
-      const { data: userSkills, error: skillsError } = await supabase
-        .from('user_skills')
-        .select('skill:skills(skill_name)')
-        .eq('user_id', user?.id);
-
-      if (skillsError) throw skillsError;
-
-      // Fetch social profiles
-      const { data: socialProfiles, error: socialError } = await supabase
-        .from('social_profiles')
-        .select('*')
-        .eq('user_id', user?.id);
-
-      if (socialError) throw socialError;
-
-      // Process social profiles
-      let portfolioUrl = "";
-      let linkedinUrl = "";
-      let githubUrl = "";
-
-      socialProfiles.forEach(profile => {
-        if (profile.platform === "portfolio") portfolioUrl = profile.profile_url;
-        if (profile.platform === "linkedin") linkedinUrl = profile.profile_url;
-        if (profile.platform === "github") githubUrl = profile.profile_url;
-      });
-
-      // Map the skills array to just the name strings
-      const skills = userSkills.map(item => item.skill.skill_name);
-
-      // Create a default role if one doesn't exist in the database
-      const role = "Professional Role Not Set"; // Default value
-
-      setUserData({
-        id: user?.id || "",
-        name: userProfile.full_name,
-        role: role, // Use default or custom role
-        location: userProfile.location || "Location Not Set",
-        bio: userProfile.bio || "No bio added yet",
-        skills: skills,
-        email: user?.email || "",
-        profileVisibility: "public", // Default values if not available in DB
-        networkingIntent: "cofounder",
-        workingStyle: "remote",
-        availability: "full-time",
-        portfolioUrl,
-        linkedinUrl,
-        githubUrl,
-        connections: 0, // These would come from actual DB count in a real app
-        profileViews: 0,
-        blockedUsers: [],
-      });
-
-      // Set form data for edit dialog
-      setFormData({
-        full_name: userProfile.full_name,
-        role: role, // Use default or custom role
-        location: userProfile.location || "",
-        bio: userProfile.bio || "",
-        profileVisibility: "public",
-        networkingIntent: "cofounder",
-        workingStyle: "remote",
-        availability: "full-time",
-        portfolioUrl,
-        linkedinUrl,
-        githubUrl,
-      });
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast.error("Failed to load profile data");
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleEditProfile = () => {
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      // Update user profile
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          full_name: formData.full_name,
-          location: formData.location,
-          bio: formData.bio,
-          updated_at: new Date().toISOString(), // Convert to ISO string to match expected type
-        })
-        .eq('user_id', user?.id);
-
-      if (profileError) throw profileError;
-
-      // Update social profiles
-      // First, delete existing profiles
-      await supabase
-        .from('social_profiles')
-        .delete()
-        .eq('user_id', user?.id);
-
-      // Then insert new profiles if URLs are provided
-      const socialProfilesToInsert = [];
-      
-      if (formData.portfolioUrl) {
-        socialProfilesToInsert.push({
-          user_id: user?.id,
-          platform: 'portfolio',
-          profile_url: formData.portfolioUrl,
-        });
-      }
-      
-      if (formData.linkedinUrl) {
-        socialProfilesToInsert.push({
-          user_id: user?.id,
-          platform: 'linkedin',
-          profile_url: formData.linkedinUrl,
-        });
-      }
-      
-      if (formData.githubUrl) {
-        socialProfilesToInsert.push({
-          user_id: user?.id,
-          platform: 'github',
-          profile_url: formData.githubUrl,
-        });
-      }
-      
-      if (socialProfilesToInsert.length > 0) {
-        const { error: socialError } = await supabase
-          .from('social_profiles')
-          .insert(socialProfilesToInsert);
-          
-        if (socialError) throw socialError;
-      }
-
-      // Refresh user data
-      await fetchUserData();
-      toast.success("Profile updated successfully");
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
-    }
-  };
-
-  const handleExportData = async () => {
-    try {
-      // Fetch all user data for export
-      const { data: userProfile, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (userError) throw userError;
-
-      const { data: userSkills, error: skillsError } = await supabase
-        .from('user_skills')
-        .select('skill:skills(skill_name)')
-        .eq('user_id', user.id);
-
-      if (skillsError) throw skillsError;
-
-      const { data: socialProfiles, error: socialError } = await supabase
-        .from('social_profiles')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (socialError) throw socialError;
-
-      // Combine all data into a single object
-      const exportData = {
-        profile: userProfile,
-        skills: userSkills.map(item => item.skill.skill_name),
-        socialProfiles: socialProfiles,
-        timestamp: new Date().toISOString()
-      };
-
-      // Convert to JSON and create download link
-      const jsonString = JSON.stringify(exportData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      // Create a temporary link and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `profile-data-${new Date().toISOString()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success("Data exported successfully");
-    } catch (error) {
-      console.error("Error exporting data:", error);
-      toast.error("Failed to export data");
-    }
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Your Profile</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportData}>
+          <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export Data
           </Button>
-          <Button onClick={handleEditProfile}>
+          <Button>
             <Edit className="h-4 w-4 mr-2" />
             Edit Profile
           </Button>
@@ -369,56 +103,42 @@ const ProfilePage = () => {
             </CardHeader>
             <CardContent>
               <ul className="space-y-3">
-                {userData.portfolioUrl && (
-                  <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                    <span className="font-medium">Portfolio</span>
-                    <a
-                      href={userData.portfolioUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-supernet-blue hover:underline flex items-center"
-                    >
-                      {userData.portfolioUrl}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </a>
-                  </li>
-                )}
-                
-                {userData.linkedinUrl && (
-                  <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                    <span className="font-medium">LinkedIn</span>
-                    <a
-                      href={userData.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-supernet-blue hover:underline flex items-center"
-                    >
-                      {userData.linkedinUrl}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </a>
-                  </li>
-                )}
-                
-                {userData.githubUrl && (
-                  <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                    <span className="font-medium">GitHub</span>
-                    <a
-                      href={userData.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-supernet-blue hover:underline flex items-center"
-                    >
-                      {userData.githubUrl}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </a>
-                  </li>
-                )}
-                
-                {!userData.portfolioUrl && !userData.linkedinUrl && !userData.githubUrl && (
-                  <li className="p-3 text-center text-gray-500">
-                    No professional links added yet
-                  </li>
-                )}
+                <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                  <span className="font-medium">Portfolio</span>
+                  <a
+                    href={userData.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-supernet-blue hover:underline flex items-center"
+                  >
+                    {userData.portfolioUrl}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </a>
+                </li>
+                <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                  <span className="font-medium">LinkedIn</span>
+                  <a
+                    href={userData.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-supernet-blue hover:underline flex items-center"
+                  >
+                    {userData.linkedinUrl}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </a>
+                </li>
+                <li className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                  <span className="font-medium">GitHub</span>
+                  <a
+                    href={userData.githubUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-supernet-blue hover:underline flex items-center"
+                  >
+                    {userData.githubUrl}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </a>
+                </li>
               </ul>
             </CardContent>
           </Card>
@@ -515,7 +235,7 @@ const ProfilePage = () => {
             <CardContent>
               {userData.blockedUsers.length > 0 ? (
                 <ul className="divide-y">
-                  {userData.blockedUsers.map((user) => (
+                  {userData.blockedUsers.map((user: any) => (
                     <li key={user.id} className="py-3 flex justify-between items-center">
                       <div>
                         <p className="font-medium">{user.name}</p>
@@ -534,103 +254,6 @@ const ProfilePage = () => {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Edit Profile Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Profile</DialogTitle>
-            <DialogDescription>
-              Update your personal and professional information
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="full_name" className="text-sm font-medium">Full Name</label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="role" className="text-sm font-medium">Professional Role</label>
-              <Input
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="location" className="text-sm font-medium">Location</label>
-              <Input
-                id="location"
-                name="location"
-                value={formData.location}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="bio" className="text-sm font-medium">Bio</label>
-              <Textarea
-                id="bio"
-                name="bio"
-                rows={4}
-                value={formData.bio}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="portfolioUrl" className="text-sm font-medium">Portfolio URL</label>
-              <Input
-                id="portfolioUrl"
-                name="portfolioUrl"
-                type="url"
-                value={formData.portfolioUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="linkedinUrl" className="text-sm font-medium">LinkedIn URL</label>
-              <Input
-                id="linkedinUrl"
-                name="linkedinUrl"
-                type="url"
-                value={formData.linkedinUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="githubUrl" className="text-sm font-medium">GitHub URL</label>
-              <Input
-                id="githubUrl"
-                name="githubUrl"
-                type="url"
-                value={formData.githubUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveProfile}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

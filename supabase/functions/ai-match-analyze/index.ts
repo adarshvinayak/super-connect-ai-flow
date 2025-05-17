@@ -12,9 +12,7 @@ const corsHeaders = {
 };
 
 // Create a Groq API client
-async function queryGroq(prompt: string, model: string = "llama-3-3-70b-versatile") {
-  console.log(`Querying GROQ with model: ${model}`);
-  
+async function queryGroq(prompt: string, model: string = "llama-3.1-8b-instant") {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -95,8 +93,6 @@ serve(async (req) => {
       Provide a detailed but concise analysis.
     `;
 
-    console.log("Sending profiles to Groq for analysis");
-    
     // Send the request to Groq API
     const groqResponse = await queryGroq(prompt);
     const analysis = groqResponse.choices[0].message.content;
@@ -106,7 +102,6 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true,
         analysis,
-        model_used: "llama-3-3-70b-versatile",
         raw_response: groqResponse
       }),
       { 
