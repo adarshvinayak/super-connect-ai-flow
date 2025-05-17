@@ -75,8 +75,11 @@ const ConnectionsPage = () => {
       } else if (connectionsData) {
         // Process the connections to extract skill names and handle possible nulls
         const processedConnections = connectionsData.map(conn => {
+          // Create a base connection without receiver and sender
           const processedConn: ConnectionData = {
-            ...conn,
+            id: conn.id,
+            created_at: conn.created_at,
+            status: conn.status,
             receiver: null,
             sender: null
           };
@@ -84,7 +87,10 @@ const ConnectionsPage = () => {
           // Process receiver data if it exists and is valid
           if (conn.receiver && isValidUserData(conn.receiver)) {
             processedConn.receiver = {
-              ...conn.receiver,
+              user_id: conn.receiver.user_id,
+              full_name: conn.receiver.full_name,
+              role: conn.receiver.role,
+              location: conn.receiver.location,
               skills: processSkills(conn.receiver.skills)
             };
           }
@@ -92,7 +98,10 @@ const ConnectionsPage = () => {
           // Process sender data if it exists and is valid
           if (conn.sender && isValidUserData(conn.sender)) {
             processedConn.sender = {
-              ...conn.sender,
+              user_id: conn.sender.user_id,
+              full_name: conn.sender.full_name,
+              role: conn.sender.role,
+              location: conn.sender.location,
               skills: processSkills(conn.sender.skills)
             };
           }
@@ -122,8 +131,11 @@ const ConnectionsPage = () => {
       } else if (requestsData) {
         // Process the requests to extract skill names and handle possible nulls
         const processedRequests = requestsData.map(req => {
+          // Create base object with type property
           const processedReq: ConnectionData & { type?: string } = {
-            ...req,
+            id: req.id,
+            created_at: req.created_at,
+            status: req.status,
             receiver: null,
             sender: null
           };
@@ -131,7 +143,10 @@ const ConnectionsPage = () => {
           // Process receiver data if it exists and is valid
           if (req.receiver && isValidUserData(req.receiver)) {
             processedReq.receiver = {
-              ...req.receiver,
+              user_id: req.receiver.user_id,
+              full_name: req.receiver.full_name,
+              role: req.receiver.role,
+              location: req.receiver.location,
               skills: processSkills(req.receiver.skills)
             };
           }
@@ -139,7 +154,10 @@ const ConnectionsPage = () => {
           // Process sender data if it exists and is valid
           if (req.sender && isValidUserData(req.sender)) {
             processedReq.sender = {
-              ...req.sender,
+              user_id: req.sender.user_id,
+              full_name: req.sender.full_name,
+              role: req.sender.role,
+              location: req.sender.location,
               skills: processSkills(req.sender.skills)
             };
           }
