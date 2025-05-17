@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConnections } from "@/hooks/useConnections";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 // MatchAnalysis component to display AI-powered match analysis
 const MatchAnalysis = ({ userId, targetUserId }: { userId: string, targetUserId: string }) => {

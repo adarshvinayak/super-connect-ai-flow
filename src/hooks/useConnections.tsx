@@ -42,8 +42,8 @@ export function useConnections() {
           status,
           created_at,
           updated_at,
-          senderProfile:sender_id(full_name),
-          receiverProfile:receiver_id(full_name)
+          sender:sender_id(user_id, full_name),
+          receiver:receiver_id(user_id, full_name)
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
@@ -56,8 +56,8 @@ export function useConnections() {
         status: conn.status,
         createdAt: conn.created_at,
         updatedAt: conn.updated_at,
-        senderName: conn.senderProfile?.full_name,
-        receiverName: conn.receiverProfile?.full_name
+        senderName: conn.sender?.full_name,
+        receiverName: conn.receiver?.full_name
       }));
 
       // Filter by status and role
@@ -231,20 +231,22 @@ export function useConnections() {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'connection_requests' }, 
         (payload) => {
-          const data = payload.new || payload.old;
+          const newData = payload.new || {};
+          const oldData = payload.old || {};
           
           // Only react to changes relevant to the current user
-          if (data.sender_id === user.id || data.receiver_id === user.id) {
+          if (newData.sender_id === user.id || newData.receiver_id === user.id || 
+              oldData.sender_id === user.id || oldData.receiver_id === user.id) {
             fetchConnections();
             
             // Show notifications for new requests
-            if (payload.eventType === 'INSERT' && data.receiver_id === user.id) {
+            if (payload.eventType === 'INSERT' && newData.receiver_id === user.id) {
               // We'll need to get the sender's name
               const getSenderName = async () => {
                 const { data: userData } = await supabase
                   .from('users')
                   .select('full_name')
-                  .eq('user_id', data.sender_id)
+                  .eq('user_id', newData.sender_id)
                   .single();
                   
                 if (userData) {

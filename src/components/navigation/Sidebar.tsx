@@ -1,3 +1,4 @@
+
 import {
   LayoutDashboard,
   MessageCircle,
@@ -6,7 +7,7 @@ import {
   User,
   Users,
 } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { useLocation } from "react-router-dom"
 
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { buttonVariants } from "@/components/ui/button"
@@ -15,7 +16,8 @@ import { Link } from "react-router-dom"
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function Sidebar({ className, ...props }: SidebarProps) {
-  const pathname = usePathname()
+  const location = useLocation();
+  const pathname = location.pathname;
 
   return (
     <div
@@ -75,10 +77,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
             <Link
               to="/profile"
               className={buttonVariants({
-                variant:
-                  pathname === "/profile"
-                    ? "default"
-                    : "ghost",
+                variant: pathname === "/profile" ? "default" : "ghost",
                 size: "sm",
                 className: "justify-start",
               })}

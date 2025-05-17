@@ -40,91 +40,70 @@ export function useMessaging() {
     setIsLoading(true);
 
     try {
-      // Get the latest message for each conversation partner
-      const { data, error } = await supabase.rpc('get_conversations', {
-        user_id: user.id
+      // Since there might be an issue with the RPC, let's implement a direct query approach
+      // Get all messages for the current user
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select(`
+          id,
+          content,
+          sender_id,
+          receiver_id,
+          created_at,
+          read,
+          sender:sender_id(user_id, full_name),
+          receiver:receiver_id(user_id, full_name)
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (messagesError) throw messagesError;
+
+      if (!messagesData) {
+        setConversations([]);
+        setUnreadCount(0);
+        setIsLoading(false);
+        return;
+      }
+
+      // Build conversations from messages
+      const userConversations = new Map<string, Conversation>();
+      let totalUnread = 0;
+
+      messagesData.forEach(msg => {
+        const isCurrentUserSender = msg.sender_id === user.id;
+        const otherUserId = isCurrentUserSender ? msg.receiver_id : msg.sender_id;
+        const otherUserName = isCurrentUserSender 
+          ? msg.receiver?.full_name || 'Unknown User'
+          : msg.sender?.full_name || 'Unknown User';
+
+        if (!userConversations.has(otherUserId)) {
+          userConversations.set(otherUserId, {
+            userId: otherUserId,
+            userName: otherUserName,
+            lastMessage: msg.content,
+            timestamp: msg.created_at,
+            unread: (!msg.read && !isCurrentUserSender) ? 1 : 0
+          });
+
+          if (!msg.read && !isCurrentUserSender) {
+            totalUnread++;
+          }
+        }
       });
 
-      if (error) throw error;
-
-      // Format the conversations
-      const formattedConversations: Conversation[] = data.map(item => ({
-        userId: item.other_user_id,
-        userName: item.other_user_name,
-        lastMessage: item.last_message,
-        timestamp: item.last_message_time,
-        unread: item.unread_count
-      }));
-
-      setConversations(formattedConversations);
-      
-      // Calculate total unread count
-      const totalUnread = formattedConversations.reduce(
-        (sum, conv) => sum + conv.unread, 0
-      );
+      setConversations(Array.from(userConversations.values()));
       setUnreadCount(totalUnread);
       
     } catch (error) {
       console.error('Error fetching conversations:', error);
       toast.error('Failed to load conversations');
-      
-      // Fallback to direct query if the RPC fails
-      try {
-        // Get all messages for the current user
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('chat_messages')
-          .select(`
-            id,
-            content,
-            sender_id,
-            receiver_id,
-            created_at,
-            read,
-            senderUser:sender_id(full_name),
-            receiverUser:receiver_id(full_name)
-          `)
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .order('created_at', { ascending: false });
-
-        if (messagesError) throw messagesError;
-
-        // Build conversations from messages
-        const userConversations = new Map<string, Conversation>();
-        let totalUnread = 0;
-
-        messagesData.forEach(msg => {
-          const isCurrentUserSender = msg.sender_id === user.id;
-          const otherUserId = isCurrentUserSender ? msg.receiver_id : msg.sender_id;
-          const otherUserName = isCurrentUserSender 
-            ? msg.receiverUser?.full_name 
-            : msg.senderUser?.full_name;
-
-          if (!userConversations.has(otherUserId)) {
-            userConversations.set(otherUserId, {
-              userId: otherUserId,
-              userName: otherUserName || 'Unknown User',
-              lastMessage: msg.content,
-              timestamp: msg.created_at,
-              unread: (!msg.read && !isCurrentUserSender) ? 1 : 0
-            });
-
-            if (!msg.read && !isCurrentUserSender) {
-              totalUnread++;
-            }
-          }
-        });
-
-        setConversations(Array.from(userConversations.values()));
-        setUnreadCount(totalUnread);
-      } catch (fallbackError) {
-        console.error('Fallback conversation loading failed:', fallbackError);
-      }
     } finally {
       setIsLoading(false);
     }
   }, [user]);
 
-  // Fetch messages for a specific conversation
+  // Fix fetch messages function
   const fetchMessages = useCallback(async (otherUserId: string) => {
     if (!user) return;
 
@@ -141,13 +120,18 @@ export function useMessaging() {
           receiver_id,
           created_at,
           read,
-          senderUser:sender_id(full_name),
-          receiverUser:receiver_id(full_name)
+          sender:sender_id(user_id, full_name),
+          receiver:receiver_id(user_id, full_name)
         `)
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+
+      if (!data) {
+        setMessages([]);
+        return;
+      }
 
       // Format messages
       const formattedMessages: Message[] = data.map(msg => ({
@@ -157,8 +141,8 @@ export function useMessaging() {
         receiverId: msg.receiver_id,
         createdAt: msg.created_at,
         read: msg.read,
-        senderName: msg.senderUser?.full_name,
-        receiverName: msg.receiverUser?.full_name
+        senderName: msg.sender?.full_name,
+        receiverName: msg.receiver?.full_name
       }));
 
       setMessages(formattedMessages);

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -658,7 +657,7 @@ export function useUserProfile() {
     }
   }, [user, fetchProfile]);
 
-  // Upload resume and parse
+  // Fix the uploadAndParseResume function
   const uploadAndParseResume = useCallback(async (file: File) => {
     if (!user) {
       toast.error('You must be logged in to upload a resume');
@@ -670,15 +669,17 @@ export function useUserProfile() {
     formData.append('userId', user.id);
 
     try {
-      const session = await getSession();
-      if (!session) {
+      // Get the session using Supabase client
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
         throw new Error('No active session');
       }
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/parse-resume`, {
+      // Use the correct URL for the Supabase function
+      const response = await fetch(`https://dvdkihicwovcfbwlfmrk.supabase.co/functions/v1/parse-resume`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${sessionData.session.access_token}`
         },
         body: formData
       });

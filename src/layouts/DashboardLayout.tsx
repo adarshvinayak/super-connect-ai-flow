@@ -1,7 +1,7 @@
 
 import { ReactNode } from 'react';
-import Navbar from '@/components/navigation/Navbar';
-import Sidebar from '@/components/navigation/Sidebar';
+import { Navbar } from '@/components/navigation/Navbar';
+import { Sidebar } from '@/components/navigation/Sidebar';
 
 interface DashboardLayoutProps {
   children: ReactNode;

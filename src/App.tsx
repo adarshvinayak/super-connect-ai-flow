@@ -7,8 +7,8 @@ import {
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { Toaster } from "@/components/ui/toaster"
-import Navbar from './components/navigation/Navbar';
-import Sidebar from './components/navigation/Sidebar';
+import { Navbar } from './components/navigation/Navbar';
+import { Sidebar } from './components/navigation/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import SearchPage from './pages/SearchPage';
 import ConnectionsPage from './pages/ConnectionsPage';

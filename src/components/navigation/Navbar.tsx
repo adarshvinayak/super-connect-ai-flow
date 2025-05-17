@@ -1,37 +1,43 @@
+
 import { useState } from "react"
 import { useTheme } from "next-themes"
-import { MoonIcon, SunIcon } from "@radix-ui/react-icons"
-import { useClerk, useSession } from "@clerk/nextjs"
+import { Moon, Sun, Menu } from "lucide-react"
 import { Link } from "react-router-dom"
+import { useAuth } from "@/hooks/useAuth"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ModeToggle } from "@/components/mode-toggle"
 import GlobalSearch from "@/components/GlobalSearch";
 import { NotificationsPopover } from "@/components/ui/notifications";
 
 interface NavbarProps {
-  isSidebarOpen: boolean
-  setIsSidebarOpen: (isOpen: boolean) => void
+  isSidebarOpen?: boolean;
+  setIsSidebarOpen?: (isOpen: boolean) => void;
 }
 
 export function Navbar({ isSidebarOpen, setIsSidebarOpen }: NavbarProps) {
-  const { theme } = useTheme()
-  const { signOut } = useClerk()
-  const { isSignedIn, session } = useSession()
-  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   return (
     <div className="border-b bg-background sticky top-0 z-50">
       <div className="flex h-16 items-center px-4">
-        <Button
-          variant="ghost"
-          className="mr-4 md:hidden"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        >
-          {isSidebarOpen ? "Close" : "Open"}
-        </Button>
+        {setIsSidebarOpen && (
+          <Button
+            variant="ghost"
+            className="mr-4 md:hidden"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">{isSidebarOpen ? "Close" : "Open"} sidebar</span>
+          </Button>
+        )}
         <div className="mr-4 hidden md:block">
           <nav className="flex items-center gap-x-4 text-sm font-medium">
             <Link to="/dashboard" className="transition-colors hover:text-foreground/80">
@@ -54,16 +60,19 @@ export function Navbar({ isSidebarOpen, setIsSidebarOpen }: NavbarProps) {
             <GlobalSearch />
           </div>
           
-          {isSignedIn && <NotificationsPopover />}
+          {user && <NotificationsPopover />}
+          
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={`https://avatar.vercel.sh/api/${session?.user.emailAddresses[0].emailAddress}.svg`} />
+                  <AvatarImage src={user?.email ? `https://avatar.vercel.sh/${user.email}.svg` : undefined} />
                   <AvatarFallback>
-                    {session?.user.firstName?.charAt(0)}
-                    {session?.user.lastName?.charAt(0)}
+                    {user?.email?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -76,11 +85,7 @@ export function Navbar({ isSidebarOpen, setIsSidebarOpen }: NavbarProps) {
                 <Link to="/settings">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  signOut()
-                }}
-              >
+              <DropdownMenuItem onClick={signOut}>
                 Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
