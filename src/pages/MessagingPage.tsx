@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,11 @@ interface Conversation {
   lastMessage: string;
   timestamp: string;
   unread: boolean;
+}
+
+// Type guard to check if an object is a valid UserData
+function isValidUserData(obj: any): obj is UserData {
+  return obj && typeof obj === 'object' && 'user_id' in obj && 'full_name' in obj;
 }
 
 const MessagingPage = () => {
@@ -101,7 +107,15 @@ const MessagingPage = () => {
       // Transform connections to conversations
       const conversationPromises = connections.map(async (conn) => {
         // Get the other user in the conversation
-        const otherUser = conn.sender?.user_id === user.id ? conn.receiver : conn.sender;
+        let otherUser: UserData | null = null;
+        
+        if (conn.sender && isValidUserData(conn.sender) && conn.sender.user_id === user.id) {
+          // Current user is sender, other user is receiver
+          otherUser = isValidUserData(conn.receiver) ? conn.receiver : null;
+        } else {
+          // Current user is receiver, other user is sender
+          otherUser = isValidUserData(conn.sender) ? conn.sender : null;
+        }
         
         if (!otherUser || !otherUser.user_id) return null;
         

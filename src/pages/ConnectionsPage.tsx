@@ -27,6 +27,20 @@ interface ConnectionData {
   status: string;
 }
 
+// Type guard to check if an object is a valid UserData
+function isValidUserData(obj: any): obj is UserData {
+  return obj && typeof obj === 'object' && 'user_id' in obj && 'full_name' in obj;
+}
+
+// Helper function to process skills data
+function processSkills(skillsData: any[] | null): { skill_name: string }[] {
+  if (!skillsData) return [];
+  
+  return skillsData.map(s => ({
+    skill_name: s.skill?.skill_name || "Unknown skill"
+  }));
+}
+
 const ConnectionsPage = () => {
   const { user } = useAuth();
   const [connections, setConnections] = useState<ConnectionData[]>([]);
@@ -60,21 +74,31 @@ const ConnectionsPage = () => {
         console.error(connectionsError);
       } else if (connectionsData) {
         // Process the connections to extract skill names and handle possible nulls
-        const processedConnections = connectionsData.map(conn => ({
-          ...conn,
-          receiver: conn.receiver ? {
-            ...conn.receiver,
-            skills: conn.receiver.skills?.map((s: any) => ({ 
-              skill_name: s.skill?.skill_name || "Unknown skill" 
-            })) || []
-          } : null,
-          sender: conn.sender ? {
-            ...conn.sender,
-            skills: conn.sender.skills?.map((s: any) => ({ 
-              skill_name: s.skill?.skill_name || "Unknown skill" 
-            })) || []
-          } : null
-        }));
+        const processedConnections = connectionsData.map(conn => {
+          const processedConn: ConnectionData = {
+            ...conn,
+            receiver: null,
+            sender: null
+          };
+          
+          // Process receiver data if it exists and is valid
+          if (conn.receiver && isValidUserData(conn.receiver)) {
+            processedConn.receiver = {
+              ...conn.receiver,
+              skills: processSkills(conn.receiver.skills)
+            };
+          }
+          
+          // Process sender data if it exists and is valid
+          if (conn.sender && isValidUserData(conn.sender)) {
+            processedConn.sender = {
+              ...conn.sender,
+              skills: processSkills(conn.sender.skills)
+            };
+          }
+          
+          return processedConn;
+        });
         
         setConnections(processedConnections);
       }
@@ -97,22 +121,34 @@ const ConnectionsPage = () => {
         console.error(requestsError);
       } else if (requestsData) {
         // Process the requests to extract skill names and handle possible nulls
-        const processedRequests = requestsData.map(conn => ({
-          ...conn,
-          receiver: conn.receiver ? {
-            ...conn.receiver,
-            skills: conn.receiver.skills?.map((s: any) => ({ 
-              skill_name: s.skill?.skill_name || "Unknown skill" 
-            })) || []
-          } : null,
-          sender: conn.sender ? {
-            ...conn.sender,
-            skills: conn.sender.skills?.map((s: any) => ({ 
-              skill_name: s.skill?.skill_name || "Unknown skill" 
-            })) || []
-          } : null,
-          type: conn.sender_id === user?.id ? 'sent' : 'received'
-        }));
+        const processedRequests = requestsData.map(req => {
+          const processedReq: ConnectionData & { type?: string } = {
+            ...req,
+            receiver: null,
+            sender: null
+          };
+          
+          // Process receiver data if it exists and is valid
+          if (req.receiver && isValidUserData(req.receiver)) {
+            processedReq.receiver = {
+              ...req.receiver,
+              skills: processSkills(req.receiver.skills)
+            };
+          }
+          
+          // Process sender data if it exists and is valid
+          if (req.sender && isValidUserData(req.sender)) {
+            processedReq.sender = {
+              ...req.sender,
+              skills: processSkills(req.sender.skills)
+            };
+          }
+          
+          // Set the type based on who sent the request
+          processedReq.type = (req.sender && isValidUserData(req.sender) && req.sender.user_id === user?.id) ? 'sent' : 'received';
+          
+          return processedReq;
+        });
         
         setRequests(processedRequests);
       }
@@ -202,11 +238,11 @@ const ConnectionsPage = () => {
     if (!user) return null;
     
     // If the current user is the receiver, return the sender
-    if (conn.receiver?.user_id === user.id) {
+    if (conn.receiver && conn.receiver.user_id === user.id) {
       return conn.sender;
     }
     // If the current user is the sender, return the receiver
-    else if (conn.sender?.user_id === user.id) {
+    else if (conn.sender && conn.sender.user_id === user.id) {
       return conn.receiver;
     }
     

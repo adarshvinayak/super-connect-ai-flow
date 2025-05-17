@@ -15,20 +15,22 @@ export async function removeDummyUsers() {
     
     if (error) {
       console.error("Error fetching users:", error);
-      return;
+      return 0;
     }
     
     // Safety check - if no users property or it's empty, don't proceed
     if (!data || !data.users || data.users.length === 0) {
       console.log("No users found to check");
-      return;
+      return 0;
     }
     
     // Filter users with test emails
     const testUsers = data.users.filter(user => {
       // Only target specific test users with a clear pattern to avoid removing real users
       // Ensure user and user.email are defined
-      return user && user.email && (
+      if (!user || !user.email) return false;
+      
+      return (
         user.email.includes("test+") || 
         user.email.includes("dummy+") ||
         user.email.startsWith("test_") ||
@@ -38,6 +40,7 @@ export async function removeDummyUsers() {
     
     console.log(`Found ${testUsers.length} test users to remove`);
     
+    let removedCount = 0;
     for (const user of testUsers) {
       if (user.id) {
         const { error } = await supabase.auth.admin.deleteUser(user.id);
@@ -45,11 +48,12 @@ export async function removeDummyUsers() {
           console.error(`Failed to delete user ${user.email}:`, error);
         } else {
           console.log(`Successfully removed test user: ${user.email}`);
+          removedCount++;
         }
       }
     }
     
-    return testUsers.length;
+    return removedCount;
   } catch (err) {
     console.error("Error in removeDummyUsers:", err);
     return 0;
