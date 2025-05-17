@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,9 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
@@ -68,19 +70,143 @@ const OnboardingPage = () => {
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      toast.error("You must be logged in to complete your profile.");
+      navigate("/auth");
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
-      // In a real app, this would send data to the backend
-      console.log("Submitting form data:", { ...formData, skills });
       
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Save user profile information
+      const { error: userError } = await supabase
+        .from('users')
+        .upsert({
+          user_id: user.id,
+          full_name: formData.fullName,
+          location: formData.location,
+          bio: formData.bio,
+          email: user.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (userError) throw userError;
+      
+      // Save ikigai responses
+      const ikigaiPromises = [
+        {
+          question_id: 1,
+          response_text: formData.purposeQuestion1,
+          user_id: user.id
+        },
+        {
+          question_id: 2,
+          response_text: formData.purposeQuestion2,
+          user_id: user.id
+        },
+        {
+          question_id: 3,
+          response_text: formData.purposeQuestion3,
+          user_id: user.id
+        }
+      ].map(response => 
+        supabase.from('ikigai_responses').upsert(response)
+      );
+      
+      await Promise.all(ikigaiPromises);
+      
+      // Save portfolio URL if provided
+      if (formData.portfolioUrl) {
+        await supabase.from('portfolios').upsert({
+          user_id: user.id,
+          portfolio_url: formData.portfolioUrl,
+          description: "User portfolio"
+        });
+      }
+      
+      // Save social profile links
+      const socialProfiles = [];
+      
+      if (formData.linkedinUrl) {
+        socialProfiles.push({
+          user_id: user.id,
+          platform: "linkedin",
+          profile_url: formData.linkedinUrl
+        });
+      }
+      
+      if (formData.githubUrl) {
+        socialProfiles.push({
+          user_id: user.id,
+          platform: "github",
+          profile_url: formData.githubUrl
+        });
+      }
+      
+      if (socialProfiles.length > 0) {
+        await supabase.from('social_profiles').upsert(socialProfiles);
+      }
+      
+      // Save networking intent
+      const { data: intentData } = await supabase
+        .from('intents')
+        .select('intent_id')
+        .eq('intent_name', formData.networkingIntent)
+        .maybeSingle();
+      
+      if (intentData) {
+        await supabase.from('user_intents').upsert({
+          user_id: user.id,
+          intent_id: intentData.intent_id,
+          details: `${formData.availability}, ${formData.workingStyle}`
+        });
+      }
+      
+      // Save skills
+      for (const skillName of skills) {
+        // First check if skill exists
+        let { data: skillData } = await supabase
+          .from('skills')
+          .select('skill_id')
+          .eq('skill_name', skillName)
+          .maybeSingle();
+        
+        // If skill doesn't exist, create it
+        if (!skillData) {
+          const { data: newSkill, error } = await supabase
+            .from('skills')
+            .insert({ skill_name: skillName })
+            .select('skill_id')
+            .single();
+          
+          if (error) throw error;
+          skillData = newSkill;
+        }
+        
+        // Link skill to user
+        if (skillData) {
+          await supabase.from('user_skills').upsert({
+            user_id: user.id,
+            skill_id: skillData.skill_id
+          });
+        }
+      }
+      
+      // Save user consent for profile visibility
+      await supabase.from('user_consent').upsert({
+        user_id: user.id,
+        consent_type: "profile_visibility",
+        consent_given: true,
+        privacy_policy_version: "1.0"
+      });
       
       toast.success("Profile created successfully!");
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting form:", error);
-      toast.error("Something went wrong. Please try again.");
+      toast.error(`Error: ${error.message || "Something went wrong. Please try again."}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -96,6 +222,7 @@ const OnboardingPage = () => {
     window.scrollTo(0, 0);
   };
 
+  
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -225,6 +352,7 @@ const OnboardingPage = () => {
                   />
                 </div>
 
+                
                 <div>
                   <Label htmlFor="portfolioUrl">Portfolio URL (optional)</Label>
                   <Input
@@ -285,9 +413,11 @@ const OnboardingPage = () => {
               </div>
             )}
 
+            
             {/* Step 3: Networking Intent */}
             {currentStep === 3 && (
               <div className="space-y-6">
+                
                 <div className="text-xl font-semibold">Networking Goals</div>
                 <p className="text-gray-600">
                   What type of connections are you primarily looking to make?
@@ -341,6 +471,7 @@ const OnboardingPage = () => {
             {/* Step 4: Skills */}
             {currentStep === 4 && (
               <div className="space-y-6">
+                
                 <div className="text-xl font-semibold">Your Skills</div>
                 <p className="text-gray-600">
                   Add skills to help us match you with the right connections.
@@ -441,6 +572,7 @@ const OnboardingPage = () => {
             {/* Step 5: Profile Visibility */}
             {currentStep === 5 && (
               <div className="space-y-6">
+                
                 <div className="text-xl font-semibold">Profile Visibility</div>
                 <p className="text-gray-600">
                   Choose who can see your profile on the platform.

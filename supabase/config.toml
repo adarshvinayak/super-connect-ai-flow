@@ -1,1 +1,8 @@
+
 project_id = "dvdkihicwovcfbwlfmrk"
+
+[functions.ai-match-analyze]
+verify_jwt = true
+
+[functions.ai-search]
+verify_jwt = true

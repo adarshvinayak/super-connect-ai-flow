@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -43,9 +42,9 @@ const AuthPage = () => {
       await signIn(email, password);
       toast.success("Signed in successfully!");
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      toast.error("Failed to sign in. Please check your credentials.");
+      toast.error(`Failed to sign in: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -68,9 +67,9 @@ const AuthPage = () => {
       await signUp(email, password);
       toast.success("Account created successfully!");
       navigate("/onboarding");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Signup error:", error);
-      toast.error("Failed to create account. Please try again.");
+      toast.error(`Failed to create account: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
