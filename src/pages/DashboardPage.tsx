@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,68 +8,58 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowRight, Search, User, Users, Star, MessageCircle } from "lucide-react";
 
 // Placeholder data for the demo
-const dummyMatches = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    role: "Frontend Developer",
-    location: "San Francisco, CA",
-    skills: ["React", "TypeScript", "UI/UX"],
-    matchReason: "Alex's frontend skills complement your backend experience, and you're both interested in AI applications.",
-    intent: "cofounder"
-  },
-  {
-    id: "2",
-    name: "Taylor Smith",
-    role: "Product Manager",
-    location: "New York, NY",
-    skills: ["Product Strategy", "User Research", "Agile"],
-    matchReason: "Taylor's product experience aligns with your technical skills, making for a potential strong founding team.",
-    intent: "cofounder"
-  },
-  {
-    id: "3",
-    name: "Jamie Rivera",
-    role: "Marketing Specialist",
-    location: "Austin, TX",
-    skills: ["Content Strategy", "SEO", "Social Media"],
-    matchReason: "Jamie is looking for technical partners for their marketing agency, which matches your client-seeking goals.",
-    intent: "client"
-  },
-  {
-    id: "4",
-    name: "Morgan Lee",
-    role: "UX Designer",
-    location: "Seattle, WA",
-    skills: ["UI Design", "User Research", "Figma"],
-    matchReason: "Morgan needs development help on client projects, which aligns with your technical skills.",
-    intent: "client"
-  },
-  {
-    id: "5",
-    name: "Casey Wong",
-    role: "Project Manager",
-    location: "Chicago, IL",
-    skills: ["Agile", "Scrum", "Team Leadership"],
-    matchReason: "Casey's team is looking for developers with your exact skill set for ongoing projects.",
-    intent: "teammate"
-  },
-  {
-    id: "6",
-    name: "Jordan Taylor",
-    role: "CTO",
-    location: "Boston, MA",
-    skills: ["System Architecture", "Team Building", "Strategic Planning"],
-    matchReason: "Jordan's startup is expanding and needs developers with your specialized skills.",
-    intent: "teammate"
-  },
-];
-
+const dummyMatches = [{
+  id: "1",
+  name: "Alex Johnson",
+  role: "Frontend Developer",
+  location: "San Francisco, CA",
+  skills: ["React", "TypeScript", "UI/UX"],
+  matchReason: "Alex's frontend skills complement your backend experience, and you're both interested in AI applications.",
+  intent: "cofounder"
+}, {
+  id: "2",
+  name: "Taylor Smith",
+  role: "Product Manager",
+  location: "New York, NY",
+  skills: ["Product Strategy", "User Research", "Agile"],
+  matchReason: "Taylor's product experience aligns with your technical skills, making for a potential strong founding team.",
+  intent: "cofounder"
+}, {
+  id: "3",
+  name: "Jamie Rivera",
+  role: "Marketing Specialist",
+  location: "Austin, TX",
+  skills: ["Content Strategy", "SEO", "Social Media"],
+  matchReason: "Jamie is looking for technical partners for their marketing agency, which matches your client-seeking goals.",
+  intent: "client"
+}, {
+  id: "4",
+  name: "Morgan Lee",
+  role: "UX Designer",
+  location: "Seattle, WA",
+  skills: ["UI Design", "User Research", "Figma"],
+  matchReason: "Morgan needs development help on client projects, which aligns with your technical skills.",
+  intent: "client"
+}, {
+  id: "5",
+  name: "Casey Wong",
+  role: "Project Manager",
+  location: "Chicago, IL",
+  skills: ["Agile", "Scrum", "Team Leadership"],
+  matchReason: "Casey's team is looking for developers with your exact skill set for ongoing projects.",
+  intent: "teammate"
+}, {
+  id: "6",
+  name: "Jordan Taylor",
+  role: "CTO",
+  location: "Boston, MA",
+  skills: ["System Architecture", "Team Building", "Strategic Planning"],
+  matchReason: "Jordan's startup is expanding and needs developers with your specialized skills.",
+  intent: "teammate"
+}];
 const DashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  return (
-    <div className="space-y-8">
+  return <div className="space-y-8">
       {/* Welcome and search section */}
       <div className="space-y-6">
         <div>
@@ -80,18 +69,7 @@ const DashboardPage = () => {
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <Input 
-            placeholder="Find connections using natural language... (e.g., 'React developers in San Francisco')" 
-            className="pl-10 py-6"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                // In a real app, this would navigate to search results
-                console.log("Searching for:", searchQuery);
-              }
-            }}
-          />
+          
         </div>
       </div>
       
@@ -161,10 +139,7 @@ const DashboardPage = () => {
           
           <TabsContent value="cofounder" className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-              {dummyMatches
-                .filter((match) => match.intent === "cofounder")
-                .map((match) => (
-                  <Card key={match.id} className="card-hover">
+              {dummyMatches.filter(match => match.intent === "cofounder").map(match => <Card key={match.id} className="card-hover">
                     <CardHeader className="pb-2">
                       <div className="flex justify-between">
                         <div>
@@ -182,9 +157,7 @@ const DashboardPage = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {match.skills.map((skill) => (
-                          <Badge key={skill} variant="secondary">{skill}</Badge>
-                        ))}
+                        {match.skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
                       </div>
                       <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
                         <p className="text-sm text-gray-600">
@@ -204,17 +177,13 @@ const DashboardPage = () => {
                         </Link>
                       </Button>
                     </CardFooter>
-                  </Card>
-                ))}
+                  </Card>)}
             </div>
           </TabsContent>
           
           <TabsContent value="client" className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-              {dummyMatches
-                .filter((match) => match.intent === "client")
-                .map((match) => (
-                  <Card key={match.id} className="card-hover">
+              {dummyMatches.filter(match => match.intent === "client").map(match => <Card key={match.id} className="card-hover">
                     <CardHeader className="pb-2">
                       <div className="flex justify-between">
                         <div>
@@ -232,9 +201,7 @@ const DashboardPage = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {match.skills.map((skill) => (
-                          <Badge key={skill} variant="secondary">{skill}</Badge>
-                        ))}
+                        {match.skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
                       </div>
                       <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
                         <p className="text-sm text-gray-600">
@@ -254,17 +221,13 @@ const DashboardPage = () => {
                         </Link>
                       </Button>
                     </CardFooter>
-                  </Card>
-                ))}
+                  </Card>)}
             </div>
           </TabsContent>
           
           <TabsContent value="teammate" className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-              {dummyMatches
-                .filter((match) => match.intent === "teammate")
-                .map((match) => (
-                  <Card key={match.id} className="card-hover">
+              {dummyMatches.filter(match => match.intent === "teammate").map(match => <Card key={match.id} className="card-hover">
                     <CardHeader className="pb-2">
                       <div className="flex justify-between">
                         <div>
@@ -282,9 +245,7 @@ const DashboardPage = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {match.skills.map((skill) => (
-                          <Badge key={skill} variant="secondary">{skill}</Badge>
-                        ))}
+                        {match.skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
                       </div>
                       <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
                         <p className="text-sm text-gray-600">
@@ -304,14 +265,11 @@ const DashboardPage = () => {
                         </Link>
                       </Button>
                     </CardFooter>
-                  </Card>
-                ))}
+                  </Card>)}
             </div>
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default DashboardPage;
